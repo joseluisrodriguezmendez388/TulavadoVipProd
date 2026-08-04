@@ -172,9 +172,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--artifact-border)}
     <div class="card" style="margin-bottom:22px">
       <form class="entry" id="entryForm">
         <label class="field">Fecha<input type="date" id="fDate" required></label>
-        <label class="field">Efectivo (caja)<input type="number" id="fCash" step="1" min="0" placeholder="0" required></label>
-        <label class="field">En cuenta (virtual)<input type="number" id="fVirtual" step="1" min="0" placeholder="0" required></label>
-        <label class="field">Gastos del día<input type="number" id="fExpense" step="1" min="0" placeholder="0"></label>
+        <label class="field">Efectivo (caja)<input type="text" inputmode="numeric" id="fCash" placeholder="0" required autocomplete="off"></label>
+        <label class="field">En cuenta (virtual)<input type="text" inputmode="numeric" id="fVirtual" placeholder="0" required autocomplete="off"></label>
+        <label class="field">Gastos del día<input type="text" inputmode="numeric" id="fExpense" placeholder="0" autocomplete="off"></label>
         <label class="field">¿A qué se pagó?<input id="fNote" placeholder="Insumos, servicios..."></label>
         <button class="btn primary" type="submit">Cerrar día</button>
       </form>
@@ -226,7 +226,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--artifact-border)}
     <p class="sub">Se suma al día indicado. Puedes registrar varias veces el mismo día. El % es lo que se llevan los lavadores (normalmente 0%).</p>
     <form id="parkForm">
       <label class="field">Fecha<input type="date" id="pDate" required></label>
-      <label class="field">Valor<input type="number" id="pValue" step="1" min="0" placeholder="0" required></label>
+      <label class="field">Valor<input type="text" inputmode="numeric" id="pValue" placeholder="0" required autocomplete="off"></label>
       <label class="field">% lavadores<input type="number" id="pPct" step="1" min="0" max="100" value="0"></label>
       <div class="row">
         <button type="button" class="btn ghost" onclick="closePark()">Cancelar</button>
@@ -265,6 +265,10 @@ function setStatus(state, msg){
 /* ================= STATE ================= */
 const COP = new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
 const fmt = n => COP.format(Math.round(n||0));
+const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleString('es-CO') : ''; };   // 1200000 -> "1.200.000"
+const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
+function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
+['fCash','fVirtual','fExpense','pValue'].forEach(attachSep);
 let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,commPct,closed}
 let commPct = 35;
 let charts = {};
@@ -341,8 +345,8 @@ document.getElementById('entryForm').onsubmit=async e=>{
     alert('El día '+fDate.value+' ya fue cerrado. Un cierre registrado no se puede modificar ni borrar.');
     return;
   }
-  const rec={date:fDate.value,cash:+fCash.value||0,virtual:+fVirtual.value||0,
-    expense:+fExpense.value||0,note:fNote.value.trim(),commPct:commPct};
+  const rec={date:fDate.value,cash:numVal(fCash),virtual:numVal(fVirtual),
+    expense:numVal(fExpense),note:fNote.value.trim(),commPct:commPct};
   try{
     await closeDay(rec);
     fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';
@@ -356,7 +360,7 @@ document.getElementById('parkModal').addEventListener('click',e=>{ if(e.target.i
 document.getElementById('parkForm').onsubmit=async e=>{
   e.preventDefault();
   const date=pDate.value; if(!date){ alert('Selecciona una fecha.'); return; }
-  const val=+pValue.value||0;
+  const val=numVal(pValue);
   const pct=Math.min(100,Math.max(0,+pPct.value||0));
   try{
     await addPark(date, val, pct);
