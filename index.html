@@ -288,7 +288,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
     </div>
     <div class="table-wrap" style="margin-bottom:24px">
       <table>
-        <thead><tr><th>Lavador</th><th class="num">Produjo (por pagar)</th><th class="num">%</th><th class="num">Por pagar</th><th class="num">Ya pagado</th></tr></thead>
+        <thead><tr><th>Lavador</th><th class="num">Produjo (total)</th><th class="num">%</th><th class="num">Por pagar</th><th class="num">Ya pagado</th></tr></thead>
         <tbody id="washBody"></tbody>
         <tfoot id="washFoot"></tfoot>
       </table>
@@ -404,14 +404,15 @@ let cobros = [];                                       // registros de cobro de 
 let charts = {};
 
 /* ---------- per-day math ---------- */
-const wash  = d => (d.cash||0)+(d.virtual||0);
-const park  = d => (d.park||0);
+const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;  // cualquier valor (texto o número) -> número
+const wash  = d => num(d.cash)+num(d.virtual);
+const park  = d => num(d.park);
 const total = d => wash(d)+park(d);
-const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*(d.parkPct||0)/100;  // lavadores
+const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;  // lavadores
 const biz   = d => total(d)-comm(d);                                               // negocio
-const net   = d => biz(d)-(d.expense||0);                                          // utilidad neta
-const debt  = d => (d.debt||0);                                                    // deuda original registrada
-const debtOut = d => Math.max(0,(d.debt||0)-(d.debtPaid||0));                       // deuda pendiente por cobrar
+const net   = d => biz(d)-num(d.expense);                                          // utilidad neta
+const debt  = d => num(d.debt);                                                    // deuda original registrada
+const debtOut = d => Math.max(0,num(d.debt)-num(d.debtPaid));                       // deuda pendiente por cobrar
 const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
 const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
 
@@ -485,7 +486,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   t.classList.add('active'); document.getElementById(t.dataset.view).classList.add('active');
   if(t.dataset.view==='resumen') setTimeout(renderCharts,50);
-  if(t.dataset.view==='lavadores') setTimeout(renderWashChart,50);
+  if(t.dataset.view==='lavadores'){ renderWashersDash(); setTimeout(renderWashChart,50); }
 });
 
 /* ---------- settings ---------- */
@@ -737,43 +738,43 @@ function renderKpis(){
   kNoDebt.textContent=fmt(T); kWithDebt.textContent=fmt(T+DBT); kDebt.textContent=fmt(DBT);
 }
 
-/* ---------- lavadores: PENDIENTE por pagar (solo días NO pagados) ---------- */
-function aggPending(){
-  const map={}; let uProd=0, uPay=0;
-  days.filter(d=>!d.washPaid).forEach(d=>{
-    const pct=(d.commPct??commPct)/100;
+/* ---------- lavadores: consolidado por lavador (pendiente + ya pagado) ----------
+   Recorre TODOS los días. Cada lavador que aparezca en algún día (o en la lista fija)
+   se muestra siempre, con su producción, su pendiente por pagar y lo ya pagado. */
+function aggWashers(){
+  const map={}; let uProdPend=0,uPayPend=0,uProdPaid=0,uPayPaid=0,paidTotal=0,paidMonth=0;
+  const cm=currentMonth();
+  const bump=k=>{ if(!map[k]) map[k]={produced:0,payTotal:0,payPending:0,payPaid:0}; return map[k]; };
+  days.forEach(d=>{
+    const pct=(num(d.commPct)||commPct)/100;
+    const paidDay=!!d.washPaid;
+    const inMonth=paidDay && (d.washPaidAt||'').slice(0,7)===cm;
+    let dayPay=0;
     if(Array.isArray(d.washers) && d.washers.length){
       d.washers.forEach(w=>{
         const key=(w.name||'').trim()||'Sin nombre';
-        if(!map[key]) map[key]={produced:0,pay:0};
-        map[key].produced+=w.amount||0;
-        map[key].pay+=(w.amount||0)*pct;
+        const amt=num(w.amount), pay=amt*pct; dayPay+=pay;
+        const m=bump(key); m.produced+=amt; m.payTotal+=pay;
+        if(paidDay) m.payPaid+=pay; else m.payPending+=pay;
       });
     } else if(wash(d)>0){
-      uProd+=wash(d); uPay+=wash(d)*pct;   // días viejos sin desglose
+      const pay=wash(d)*pct; dayPay+=pay;
+      if(paidDay){ uProdPaid+=wash(d); uPayPaid+=pay; } else { uProdPend+=wash(d); uPayPend+=pay; }
     }
+    if(paidDay){ paidTotal+=dayPay; if(inMonth) paidMonth+=dayPay; }
   });
-  const arr=Object.entries(map).map(([name,v])=>({name,...v})).sort((a,b)=>b.pay-a.pay);
-  return {map,arr,uProd,uPay};
-}
-/* ---------- lavadores: YA PAGADO (registros de pago) ---------- */
-function aggPaid(){
-  const map={}; let total=0, month=0; const cm=currentMonth();
-  pagos.forEach(p=>{
-    total+=p.total||0;
-    if((p.paidAt||'').slice(0,7)===cm) month+=p.total||0;
-    (p.detail||[]).forEach(w=>{ const k=(w.name||'').trim()||'Sin nombre'; map[k]=(map[k]||0)+(w.amount||0); });
-  });
-  return {map,total,month};
+  roster.forEach(n=>{ const k=(n||'').trim(); if(k) bump(k); });   // que todos los lavadores fijos aparezcan siempre
+  const arr=Object.entries(map).map(([name,v])=>({name,...v})).sort((a,b)=>b.payPending-a.payPending||b.payTotal-a.payTotal);
+  return {map,arr,uProdPend,uPayPend,uProdPaid,uPayPaid,paidTotal,paidMonth};
 }
 /* ---------- "Ya pagué a los lavadores": pone el pendiente en cero (sin tocar ganancias) y registra el pago ---------- */
 async function payWashers(){
-  const pend=aggPending();
-  const list=days.filter(d=>!d.washPaid && (Array.isArray(d.washers)&&d.washers.length ? d.washers.some(w=>(w.amount||0)>0) : wash(d)>0));
-  const total=Math.round(pend.arr.reduce((a,r)=>a+r.pay,0)+pend.uPay);
+  const w=aggWashers();
+  const list=days.filter(d=>!d.washPaid && (Array.isArray(d.washers)&&d.washers.length ? d.washers.some(x=>num(x.amount)>0) : wash(d)>0));
+  const total=Math.round(w.arr.reduce((a,r)=>a+r.payPending,0)+w.uPayPend);
   if(total<=0){ alert('No hay pagos pendientes.'); return; }
-  const detail=pend.arr.map(r=>({name:r.name,amount:Math.round(r.pay)}));
-  if(pend.uPay>0) detail.push({name:'Sin asignar',amount:Math.round(pend.uPay)});
+  const detail=w.arr.filter(r=>r.payPending>0).map(r=>({name:r.name,amount:Math.round(r.payPending)}));
+  if(w.uPayPend>0) detail.push({name:'Sin asignar',amount:Math.round(w.uPayPend)});
   if(!confirm('Vas a marcar como PAGADO '+fmt(total)+' a los lavadores.\n\nEsto pone el pendiente en cero (no cambia tus ganancias) y guarda el registro del pago. ¿Continuar?')) return;
   const paidAt=new Date().toISOString().slice(0,10);
   try{
@@ -784,24 +785,22 @@ async function payWashers(){
 }
 window.payWashers=payWashers;
 function renderWashersDash(){
-  const pend=aggPending(), paid=aggPaid();
-  const names=new Set([...pend.arr.map(a=>a.name), ...Object.keys(paid.map)]);
-  const rows=[...names].map(n=>{ const p=pend.map[n]||{produced:0,pay:0}; return {name:n,produced:p.produced,pay:p.pay,paid:paid.map[n]||0}; })
-                       .sort((a,b)=>b.pay-a.pay);
-  if(pend.uPay>0) rows.push({name:'Sin asignar (días viejos)',produced:pend.uProd,pay:pend.uPay,paid:0});
-  const totProd=rows.reduce((a,r)=>a+r.produced,0), totPay=rows.reduce((a,r)=>a+r.pay,0), totPaid=paid.total;
+  const w=aggWashers();
+  const rows=w.arr.map(r=>({name:r.name,produced:r.produced,pay:r.payPending,paid:r.payPaid,pct:r.produced>0?Math.round(r.payTotal/r.produced*100):commPct}));
+  if(w.uPayPend>0||w.uPayPaid>0) rows.push({name:'Sin asignar (días viejos)',produced:w.uProdPend+w.uProdPaid,pay:w.uPayPend,paid:w.uPayPaid,pct:commPct});
+  const totProd=rows.reduce((a,r)=>a+r.produced,0), totPay=rows.reduce((a,r)=>a+r.pay,0), totPaid=rows.reduce((a,r)=>a+r.paid,0);
   document.getElementById('washBody').innerHTML = rows.length? rows.map(r=>`<tr>
     <td>${r.name}</td>
     <td class="num">${fmt(r.produced)}</td>
-    <td class="num">${r.produced?Math.round(r.pay/r.produced*100):commPct}%</td>
+    <td class="num">${r.pct}%</td>
     <td class="num pos">${fmt(r.pay)}</td>
     <td class="num">${fmt(r.paid)}</td></tr>`).join('')
     : `<tr><td colspan="5" class="empty">Aún no hay lavadores por pagar. Asígnalos al cerrar un día.</td></tr>`;
   document.getElementById('washFoot').innerHTML = rows.length?`<tr>
     <td>TOTAL</td><td class="num">${fmt(totProd)}</td><td></td><td class="num">${fmt(totPay)}</td><td class="num">${fmt(totPaid)}</td></tr>`:'';
   document.getElementById('wPay').textContent=fmt(totPay);
-  document.getElementById('wPaidTot').textContent=fmt(paid.total);
-  document.getElementById('wPaidMonth').textContent=fmt(paid.month);
+  document.getElementById('wPaidTot').textContent=fmt(w.paidTotal);
+  document.getElementById('wPaidMonth').textContent=fmt(w.paidMonth);
   const pg=[...pagos].sort((a,b)=>(b.paidAt||'').localeCompare(a.paidAt||''));
   document.getElementById('pagosBody').innerHTML = pg.length? pg.map(p=>`<tr><td>${p.paidAt||''}</td><td class="num">${p.count||''}</td><td class="num pos">${fmt(p.total)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="empty">Aún no has registrado pagos.</td></tr>`;
@@ -834,11 +833,11 @@ function renderCharts(){
 }
 function renderWashChart(){
   const axis=themeAxis();
-  const {arr}=aggPending();
+  const arr=aggWashers().arr.filter(a=>a.payPending>0);
   mk('chartWash').setOption({tooltip:{trigger:'axis',valueFormatter:v=>fmt(v)},grid:{left:80,right:16,top:20,bottom:50},
     xAxis:{type:'category',data:arr.map(a=>a.name),axisLabel:{color:axis,rotate:arr.length>4?30:0}},
     yAxis:{type:'value',axisLabel:{color:axis,formatter:v=>v>=1e6?(v/1e6)+'M':v/1e3+'k'}},
-    series:[{type:'bar',data:arr.map(a=>Math.round(a.pay)),itemStyle:{color:'#b8860b'},barMaxWidth:60,
+    series:[{type:'bar',data:arr.map(a=>Math.round(a.payPending)),itemStyle:{color:'#b8860b'},barMaxWidth:60,
       label:{show:true,position:'top',color:axis,formatter:p=>fmt(p.value)}}]});
 }
 window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c.resize()));
@@ -893,11 +892,10 @@ function exportExcel(){
     {Concepto:'Total generado',Valor:T},{Concepto:'En efectivo',Valor:C},{Concepto:'En cuenta',Valor:V},
     {Concepto:'Parqueadero',Valor:P},{Concepto:'Lavadores',Valor:CM},{Concepto:'Gastos',Valor:EX},{Concepto:'Utilidad negocio neta',Valor:NT},
     {Concepto:'Total sin deuda (hoy)',Valor:T},{Concepto:'Total con deuda (si pagan)',Valor:T+DBT},{Concepto:'Nos falta por cobrar (deuda)',Valor:DBT}]),'Resumen');
-  const pend=aggPending(), paidAgg=aggPaid();
-  const wnames=[...new Set([...pend.arr.map(a=>a.name), ...Object.keys(paidAgg.map)])];
-  const wrows=wnames.map(n=>{const p=pend.map[n]||{produced:0,pay:0};return {Lavador:n,'Produjo (por pagar)':Math.round(p.produced),'Por pagar':Math.round(p.pay),'Ya pagado':Math.round(paidAgg.map[n]||0)};});
-  if(pend.uProd>0) wrows.push({Lavador:'Sin asignar (días viejos)','Produjo (por pagar)':Math.round(pend.uProd),'Por pagar':Math.round(pend.uPay),'Ya pagado':0});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wrows.length?wrows:[{Lavador:'','Produjo (por pagar)':'','Por pagar':'','Ya pagado':''}]),'Lavadores');
+  const wagg=aggWashers();
+  const wrows=wagg.arr.map(r=>({Lavador:r.name,'Produjo':Math.round(r.produced),'Por pagar':Math.round(r.payPending),'Ya pagado':Math.round(r.payPaid)}));
+  if(wagg.uPayPend>0||wagg.uPayPaid>0) wrows.push({Lavador:'Sin asignar (días viejos)','Produjo':Math.round(wagg.uProdPend+wagg.uProdPaid),'Por pagar':Math.round(wagg.uPayPend),'Ya pagado':Math.round(wagg.uPayPaid)});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wrows.length?wrows:[{Lavador:'','Produjo':'','Por pagar':'','Ya pagado':''}]),'Lavadores');
   const prows=[...pagos].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(p=>({['Fecha de pago']:p.paidAt||'','Días':p.count||0,'Total pagado':p.total||0,'Detalle':(p.detail||[]).map(w=>`${w.name}:${w.amount}`).join(' | ')}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(prows.length?prows:[{['Fecha de pago']:'','Días':'','Total pagado':'','Detalle':''}]),'Pagos');
   const crows=[...cobros].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(c=>({['Día de la deuda']:c.dayDate||'','Fecha de cobro':c.paidAt||'','Valor cobrado':c.amount||0,'Quién pagó':c.who||''}));
