@@ -446,8 +446,10 @@ onSnapshot(collection(db, COL_DAYS),
 );
 onSnapshot(doc(db, "config", "general"),
   snap => {
-    if (snap.exists() && snap.data().commPct != null){
-      commPct = +snap.data().commPct;
+    if (snap.exists()){
+      const saved = +snap.data().commPct;
+      // El default siempre es 35%. Un 0/valor invalido guardado no debe pisar el default.
+      commPct = (Number.isFinite(saved) && saved > 0) ? saved : 35;
       commInput.value = commPct;
       refreshPctLabels();
       renderAll();
