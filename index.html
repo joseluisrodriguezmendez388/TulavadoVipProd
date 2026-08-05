@@ -101,6 +101,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--artifact-border)}
 .badge-assign{font-size:.68rem;color:var(--artifact-amber);background:rgba(184,134,11,.12);border:1px solid var(--artifact-amber);padding:2px 7px;border-radius:999px;margin-left:6px;font-weight:700}
 .mini-btn{font:inherit;font-size:.7rem;font-weight:700;border:1px solid var(--artifact-amber);color:var(--artifact-amber);background:rgba(184,134,11,.12);padding:3px 9px;border-radius:999px;cursor:pointer;margin-left:6px;white-space:nowrap}
 .mini-btn:hover{background:var(--artifact-amber);color:#fff}
+.mini-btn.red{border-color:var(--artifact-red);color:var(--artifact-red);background:var(--artifact-red-soft)}
+.mini-btn.red:hover{background:var(--artifact-red);color:#fff}
 .modal .wash-row{grid-template-columns:1fr 110px 40px}
 .modal #assignWashersList{margin-bottom:4px}
 .park-col{color:var(--artifact-teal);font-weight:600}
@@ -170,6 +172,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <div class="brand"><h1>Tu Lavado <b>VIP</b> · Contabilidad</h1><span>Cierre diario · Sincronizado en la nube (Firestore)</span></div>
     <span id="cloudStatus" class="cloud wait">Conectando...</span>
     <button class="btn primary" onclick="openPark()">＋ Registrar parqueadero</button>
+    <button class="btn" onclick="openCobro()">＄ Cobrar deuda</button>
     <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
     <button class="btn" onclick="document.getElementById('importFile').click()">Importar Excel</button>
     <button class="btn" onclick="exportExcel()">Exportar Excel</button>
@@ -340,6 +343,24 @@ tr.has-debt{background:var(--artifact-red-soft)}
   </div>
 </div>
 
+<!-- MODAL COBRAR DEUDA -->
+<div class="modal-back" id="cobroModal">
+  <div class="modal">
+    <h3>Cobrar deuda</h3>
+    <p class="sub">Registra un pago de una deuda pendiente y asígnalo a un día. Cuando la deuda de ese día llegue a cero, el día queda consolidado y desaparece la línea roja.</p>
+    <form id="cobroForm">
+      <label class="field">Día con deuda<select id="cDay" required></select></label>
+      <p class="sub" id="cInfo" style="margin:-4px 0 0"></p>
+      <label class="field">Valor cobrado<input type="text" inputmode="numeric" id="cValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">¿Quién pagó?<input id="cWho" placeholder="Juan..." autocomplete="off"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeCobro()">Cancelar</button>
+        <button type="submit" class="btn primary">Registrar cobro</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot }
@@ -374,11 +395,12 @@ const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleStri
 const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
 const digits = v => +(''+v).replace(/\D/g,'')||0;
 function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
-['fCash','fVirtual','fExpense','fDebt','pValue'].forEach(attachSep);
+['fCash','fVirtual','fExpense','fDebt','pValue','cValue'].forEach(attachSep);
 let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,debt,debtWho,washers:[{name,amount}],commPct,closed}
 let commPct = 35;
 let roster = ['Lavador 1','Lavador 2','Lavador 3'];  // lista fija de lavadores (persistida)
 let pagos = [];                                        // registros de pago a lavadores
+let cobros = [];                                       // registros de cobro de deudas
 let charts = {};
 
 /* ---------- per-day math ---------- */
@@ -388,9 +410,10 @@ const total = d => wash(d)+park(d);
 const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*(d.parkPct||0)/100;  // lavadores
 const biz   = d => total(d)-comm(d);                                               // negocio
 const net   = d => biz(d)-(d.expense||0);                                          // utilidad neta
-const debt  = d => (d.debt||0);                                                    // lo que quedaron debiendo
+const debt  = d => (d.debt||0);                                                    // deuda original registrada
+const debtOut = d => Math.max(0,(d.debt||0)-(d.debtPaid||0));                       // deuda pendiente por cobrar
 const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
-const isLocked   = d => !!(d && d.closed && !((d.debt||0)>0) && hasWashers(d));     // cierre completo -> bloqueado
+const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
 
 /* ---------- Firestore writes ---------- */
 async function closeDay(d){
@@ -448,6 +471,11 @@ onSnapshot(collection(db, "pagos"),
     renderWashersDash();
     if (document.getElementById('lavadores').classList.contains('active')) renderWashChart();
   },
+  () => {}
+);
+/* registros de cobro de deudas */
+onSnapshot(collection(db, "cobros"),
+  snap => { cobros = snap.docs.map(x => ({ id:x.id, ...x.data() })); },
   () => {}
 );
 
@@ -559,6 +587,7 @@ document.getElementById('entryForm').onsubmit=async e=>{
     washers, commPct:commPct};
   try{
     await closeDay(rec);
+    syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
     fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
     initWashers();
   }catch(err){ alert('No se pudo guardar en la nube: '+err.message); }
@@ -632,12 +661,45 @@ document.getElementById('assignForm').onsubmit=async e=>{
 window.assignWashers=assignWashers;
 window.closeAssign=closeAssign;
 
+/* ---------- modal COBRAR DEUDA ---------- */
+function openCobro(preDate){
+  const list=days.filter(d=>debtOut(d)>0).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!list.length){ alert('No hay deudas pendientes por cobrar. Todos los días están consolidados.'); return; }
+  const sel=document.getElementById('cDay');
+  sel.innerHTML=list.map(d=>`<option value="${d.date}">${d.date} — debe ${fmt(debtOut(d))}</option>`).join('');
+  if(preDate && list.some(d=>d.date===preDate)) sel.value=preDate;
+  cValue.value=''; cWho.value='';
+  updateCobroInfo();
+  document.getElementById('cobroModal').classList.add('open');
+}
+function updateCobroInfo(){
+  const d=days.find(x=>x.date===cDay.value);
+  document.getElementById('cInfo').textContent = d ? ('Deuda pendiente de ese día: '+fmt(debtOut(d))+(d.debtWho?' · quedó debiendo: '+d.debtWho:'')) : '';
+}
+function closeCobro(){ document.getElementById('cobroModal').classList.remove('open'); }
+document.getElementById('cDay').addEventListener('change',updateCobroInfo);
+document.getElementById('cobroModal').addEventListener('click',e=>{ if(e.target.id==='cobroModal') closeCobro(); });
+document.getElementById('cobroForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===cDay.value); if(!d){ closeCobro(); return; }
+  const val=numVal(cValue), out=debtOut(d);
+  if(val<=0){ alert('Ingresa el valor cobrado.'); return; }
+  if(val>out){ alert('No puedes cobrar más de lo que deben.\n\nDeuda pendiente de ese día: '+fmt(out)+'.'); return; }
+  try{
+    await setDoc(doc(db,COL_DAYS,d.date),{debtPaid:(d.debtPaid||0)+val,updatedAt:Date.now()},{merge:true});
+    await addDoc(collection(db,'cobros'),{dayDate:d.date,amount:val,who:cWho.value.trim(),paidAt:new Date().toISOString().slice(0,10),createdAt:Date.now()});
+    closeCobro();
+  }catch(err){ alert('No se pudo registrar el cobro: '+err.message); }
+};
+window.openCobro=openCobro; window.closeCobro=closeCobro;
+
 /* ---------- render table ---------- */
 function renderDays(){
   const rows=[...days].sort((a,b)=>b.date.localeCompare(a.date));
   const b=document.getElementById('dayBody');
   b.innerHTML = rows.length? rows.map(d=>{
-    const hasDebt=(d.debt||0)>0;
+    const out=debtOut(d);
+    const hasDebt=out>0;
     const needW = d.closed && !hasDebt && !hasWashers(d) && wash(d)>0;
     const badge = hasDebt ? ' <span class="badge-val">en validación</span>'
                 : needW   ? ' <button type="button" class="mini-btn" onclick="assignWashers(\''+d.date+'\')">＋ Asignar lavadores</button>'
@@ -652,12 +714,12 @@ function renderDays(){
     <td class="num">${fmt(biz(d))}</td>
     <td class="num">${fmt(d.expense)}</td>
     <td>${d.note||''}</td>
-    <td class="num debt-col">${hasDebt?fmt(d.debt):''}${d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:''}</td>
+    <td class="num debt-col">${hasDebt?fmt(out):''}${hasDebt&&d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:''}${hasDebt?`<button type="button" class="mini-btn red" onclick="openCobro('${d.date}')">Cobrar deuda</button>`:''}</td>
     <td class="num ${net(d)>=0?'pos':'neg'}">${fmt(net(d))}</td></tr>`;}).join('')
     : `<tr><td colspan="11" class="empty">Aún no hay días registrados. Agrega tu primer cierre arriba para empezar.</td></tr>`;
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), BZ=days.reduce((a,d)=>a+biz(d),0),
-        EX=days.reduce((a,d)=>a+(d.expense||0),0), NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debt(d),0);
+        EX=days.reduce((a,d)=>a+(d.expense||0),0), NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
   document.getElementById('dayFoot').innerHTML = days.length?`<tr>
     <td>TOTAL</td><td class="num">${fmt(C)}</td><td class="num">${fmt(V)}</td><td class="num park-col">${fmt(P)}</td><td class="num">${fmt(T)}</td>
     <td class="num">${fmt(CM)}</td><td class="num">${fmt(BZ)}</td><td class="num">${fmt(EX)}</td><td></td>
@@ -669,7 +731,7 @@ function renderDays(){
 function renderKpis(){
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), EX=days.reduce((a,d)=>a+(d.expense||0),0),
-        NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debt(d),0);
+        NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
   kTotal.textContent=fmt(T); kCash.textContent=fmt(C); kVirtual.textContent=fmt(V);
   kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT);
   kNoDebt.textContent=fmt(T); kWithDebt.textContent=fmt(T+DBT); kDebt.textContent=fmt(DBT);
@@ -799,7 +861,7 @@ document.getElementById('importFile').onchange=e=>{
     const recs=rows.map(x=>({date:normDate(x.Fecha),cash:+x.Efectivo||0,virtual:+x.Cuenta||+x.Virtual||0,
       park:+x.Parqueadero||0, parkPct:x['% Parq.']!=null?+x['% Parq.']:0,
       expense:+x.Gastos||0,note:x.Detalle||x.Nota||'',
-      debt:+x.Debe||0, debtWho:x['Quién debe']||x.Quien||'',
+      debt:+x.Debe||+x['Debe (original)']||0, debtPaid:+x.Cobrado||0, debtWho:x['Quién debe']||x.Quien||'',
       washers:parseWashers(x['Lavadores (detalle)']),
       commPct:x['% Lavadores']!=null?+x['% Lavadores']:commPct,closed:true}))
       .filter(x=>x.date);
@@ -821,9 +883,9 @@ function exportExcel(){
   const rows=[...days].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
     Fecha:d.date,Efectivo:d.cash||0,Cuenta:d.virtual||0,Parqueadero:park(d),'Total del día':total(d),
     ['% Lavadores']:d.commPct??commPct,['% Parq.']:d.parkPct||0,'Lavadores':comm(d),'Negocio':biz(d),
-    Gastos:d.expense||0,Detalle:d.note||'','Debe':d.debt||0,'Quién debe':d.debtWho||'',
+    Gastos:d.expense||0,Detalle:d.note||'','Debe (original)':d.debt||0,'Cobrado':d.debtPaid||0,'Deuda pendiente':debtOut(d),'Quién debe':d.debtWho||'',
     'Lavadores (detalle)':washersToStr(d.washers),'Utilidad neta':net(d)}));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'',Detalle:'','Debe':'','Quién debe':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'',Detalle:'','Debe (original)':'','Cobrado':'','Deuda pendiente':'','Quién debe':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
   const T=days.reduce((a,d)=>a+total(d),0),C=days.reduce((a,d)=>a+(d.cash||0),0),V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0),CM=days.reduce((a,d)=>a+comm(d),0),EX=days.reduce((a,d)=>a+(d.expense||0),0),
         NT=days.reduce((a,d)=>a+net(d),0),DBT=days.reduce((a,d)=>a+debt(d),0);
@@ -838,6 +900,8 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wrows.length?wrows:[{Lavador:'','Produjo (por pagar)':'','Por pagar':'','Ya pagado':''}]),'Lavadores');
   const prows=[...pagos].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(p=>({['Fecha de pago']:p.paidAt||'','Días':p.count||0,'Total pagado':p.total||0,'Detalle':(p.detail||[]).map(w=>`${w.name}:${w.amount}`).join(' | ')}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(prows.length?prows:[{['Fecha de pago']:'','Días':'','Total pagado':'','Detalle':''}]),'Pagos');
+  const crows=[...cobros].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(c=>({['Día de la deuda']:c.dayDate||'','Fecha de cobro':c.paidAt||'','Valor cobrado':c.amount||0,'Quién pagó':c.who||''}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crows.length?crows:[{['Día de la deuda']:'','Fecha de cobro':'','Valor cobrado':'','Quién pagó':''}]),'Cobros');
   XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 function downloadTemplate(){
