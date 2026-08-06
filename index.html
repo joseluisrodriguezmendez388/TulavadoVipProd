@@ -280,6 +280,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
         <p class="section-sub" style="margin:0">Cuánto se le debe pagar a cada lavador (su comisión del <span class="cpct">35</span>%). Cuando les pagues, usa el botón: el pendiente vuelve a cero, tus ganancias no cambian y queda el registro del pago.</p>
       </div>
       <button class="btn primary" onclick="payWashers()">✓ Ya pagué a los lavadores</button>
+      <button class="btn ghost" onclick="undoPay()" style="margin-left:8px">↩ Deshacer último pago</button>
     </div>
     <div class="kpis">
       <div class="kpi amber"><div class="lbl">Por pagar ahora</div><div class="val" id="wPay">$0</div><div class="sub">pendiente por pagar</div></div>
@@ -793,6 +794,28 @@ async function payWashers(){
   }catch(err){ alert('No se pudo registrar el pago: '+err.message); }
 }
 window.payWashers=payWashers;
+/* ---------- Deshacer último pago: devuelve los días del último pago a "por pagar" ---------- */
+async function undoPay(){
+  const paid=days.filter(d=>!!d.washPaid);
+  if(!paid.length){ alert('No hay pagos que deshacer.'); return; }
+  // agrupar por fecha de pago y tomar el más reciente
+  const groups={};
+  paid.forEach(d=>{ const k=d.washPaidAt||'anterior'; (groups[k]=groups[k]||[]).push(d); });
+  const lastKey=Object.keys(groups).sort((a,b)=>b.localeCompare(a))[0];
+  const list=groups[lastKey];
+  const pct=d=>(num(d.commPct)||commPct)/100;
+  const total=Math.round(list.reduce((a,d)=>{
+    const p= (Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
+    return a+p*pct(d);
+  },0));
+  const label=lastKey==='anterior'?'(pago anterior sin fecha)':lastKey;
+  if(!confirm('Vas a DESHACER el pago del '+label+'.\n\nSe devolverán '+fmt(total)+' de '+list.length+' día(s) a "Por pagar". Tus ganancias no cambian. ¿Continuar?')) return;
+  try{
+    for(const d of list){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:false,washPaidAt:'',updatedAt:Date.now()},{merge:true}); }
+    alert('Pago deshecho: '+fmt(total)+' vuelve a "Por pagar".');
+  }catch(err){ alert('No se pudo deshacer el pago: '+err.message); }
+}
+window.undoPay=undoPay;
 function renderWashersDash(){
   const w=aggWashers();
   const rows=w.arr.map(r=>({name:r.name,produced:r.produced,pay:r.payPending,paid:r.payPaid,pct:r.produced>0?Math.round(r.payTotal/r.produced*100):commPct}));
