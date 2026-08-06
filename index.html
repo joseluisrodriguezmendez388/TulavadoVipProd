@@ -281,6 +281,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       </div>
       <button class="btn primary" onclick="payWashers()">✓ Ya pagué a los lavadores</button>
       <button class="btn ghost" onclick="undoPay()" style="margin-left:8px">↩ Deshacer último pago</button>
+      <button class="btn ghost" onclick="resetPay()" style="margin-left:8px;color:var(--artifact-red);border-color:var(--artifact-red)">⟲ Resetear pagos</button>
     </div>
     <div class="kpis">
       <div class="kpi amber"><div class="lbl">Por pagar ahora</div><div class="val" id="wPay">$0</div><div class="sub">pendiente por pagar</div></div>
@@ -816,6 +817,22 @@ async function undoPay(){
   }catch(err){ alert('No se pudo deshacer el pago: '+err.message); }
 }
 window.undoPay=undoPay;
+/* ---------- Resetear pagos: devuelve TODO lo ya pagado a "por pagar" y vacía el historial ---------- */
+async function resetPay(){
+  const paid=days.filter(d=>!!d.washPaid);
+  if(!paid.length){ alert('No hay pagos registrados para resetear.'); return; }
+  const pct=d=>(num(d.commPct)||commPct)/100;
+  const total=Math.round(paid.reduce((a,d)=>{
+    const p=(Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
+    return a+p*pct(d);
+  },0));
+  if(!confirm('RESETEAR TODOS LOS PAGOS\n\nSe devolverán '+fmt(total)+' de '+paid.length+' día(s) desde "Ya pagado" a "Por pagar", y el historial de pagos quedará vacío.\n\nTus ganancias NO cambian. ¿Continuar?')) return;
+  try{
+    for(const d of paid){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:false,washPaidAt:'',updatedAt:Date.now()},{merge:true}); }
+    alert('Pagos reseteados: '+fmt(total)+' vuelve a "Por pagar". El historial quedó vacío.');
+  }catch(err){ alert('No se pudo resetear: '+err.message); }
+}
+window.resetPay=resetPay;
 function renderWashersDash(){
   const w=aggWashers();
   const rows=w.arr.map(r=>({name:r.name,produced:r.produced,pay:r.payPending,paid:r.payPaid,pct:r.produced>0?Math.round(r.payTotal/r.produced*100):commPct}));
