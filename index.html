@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tu Lavado VIP — Contabilidad</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+:root{
+  --artifact-background: var(--theme-background, #f7f8fa);
+  --artifact-surface: var(--theme-background-elevated, #ffffff);
+  --artifact-surface-2: var(--theme-background-light, #eef1f5);
+  --artifact-border: var(--theme-border, #e2e6ec);
+  --artifact-text: var(--theme-text-primary, #131722);
+  --artifact-text-soft: var(--theme-text-secondary, #5b6472);
+  --artifact-accent: var(--theme-primary-highlight, #2f6bff);
+  --artifact-accent-soft: rgba(47,107,255,0.10);
+  --artifact-green: #17915b;
+  --artifact-green-soft: rgba(23,145,91,0.10);
+  --artifact-red: #d1435b;
+  --artifact-red-soft: rgba(209,67,91,0.10);
+  --artifact-amber: #b8860b;
+  --artifact-teal:#0d9488;
+  --artifact-shadow: 0 1px 3px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.05);
+  --artifact-radius: 14px;
+}
+html[data-theme='dark']{
+  --artifact-background:#0e1116; --artifact-surface:#161b22; --artifact-surface-2:#1c232d;
+  --artifact-border:#2a323d; --artifact-text:#e6e9ee; --artifact-text-soft:#98a2b3;
+  --artifact-accent:#5a8bff; --artifact-accent-soft:rgba(90,139,255,.14);
+  --artifact-green:#3ecf8e; --artifact-green-soft:rgba(62,207,142,.14);
+  --artifact-red:#ff6b81; --artifact-red-soft:rgba(255,107,129,.14);
+  --artifact-amber:#e5b34a; --artifact-teal:#2dd4bf;
+  --artifact-shadow:0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--artifact-background);color:var(--artifact-text);line-height:1.45}
+.shell{max-width:1100px;margin:0 auto;padding:0 20px 64px}
+header.topbar{position:sticky;top:0;z-index:50;background:var(--artifact-background);border-bottom:1px solid var(--artifact-border);padding:16px 20px;margin-bottom:24px}
+.topbar-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;margin-right:auto}
+.brand h1{font-size:1.18rem;margin:0;letter-spacing:-.01em}
+.brand h1 b{color:var(--artifact-accent)}
+.brand span{font-size:.78rem;color:var(--artifact-text-soft)}
+.btn{font:inherit;font-size:.85rem;font-weight:600;border:1px solid var(--artifact-border);background:var(--artifact-surface);color:var(--artifact-text);padding:9px 14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.15s}
+.btn:hover{border-color:var(--artifact-accent);color:var(--artifact-accent)}
+.btn.primary{background:var(--artifact-accent);border-color:var(--artifact-accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.05);color:#fff}
+.btn.ghost{background:transparent}
+.tabs{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
+.tab{padding:9px 16px;border-radius:10px;cursor:pointer;font-weight:600;font-size:.88rem;color:var(--artifact-text-soft);border:1px solid transparent}
+.tab.active{background:var(--artifact-accent-soft);color:var(--artifact-accent);border-color:var(--artifact-accent)}
+.view{display:none}
+.view.active{display:block;animation:fade .3s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.kpi{background:var(--artifact-surface);border:1px solid var(--artifact-border);border-radius:var(--artifact-radius);padding:18px;box-shadow:var(--artifact-shadow)}
+.kpi .lbl{font-size:.76rem;color:var(--artifact-text-soft);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.kpi .val{font-size:1.55rem;font-weight:700;margin-top:6px;letter-spacing:-.02em}
+.kpi .sub{font-size:.74rem;color:var(--artifact-text-soft);margin-top:2px}
+.kpi.green .val{color:var(--artifact-green)}
+.kpi.red .val{color:var(--artifact-red)}
+.kpi.red{border-color:var(--artifact-red);background:var(--artifact-red-soft)}
+.kpi.accent .val{color:var(--artifact-accent)}
+.kpi.teal .val{color:var(--artifact-teal)}
+.kpi.amber .val{color:var(--artifact-amber)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:820px){.grid-2{grid-template-columns:1fr}}
+.card{background:var(--artifact-surface);border:1px solid var(--artifact-border);border-radius:var(--artifact-radius);padding:20px;box-shadow:var(--artifact-shadow)}
+.card h3{margin:0 0 14px;font-size:1rem}
+.chart{width:100%;height:300px}
+.card.tall .chart{height:340px}
+.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+label.field{display:flex;flex-direction:column;gap:5px;font-size:.8rem;color:var(--artifact-text-soft);font-weight:600}
+input,select{font:inherit;font-size:.9rem;padding:9px 11px;border:1px solid var(--artifact-border);border-radius:9px;background:var(--artifact-background);color:var(--artifact-text)}
+input:focus,select:focus{outline:none;border-color:var(--artifact-accent)}
+label.field.debt input{border-color:var(--artifact-red)}
+/* --- lavadores en el formulario --- */
+.washers-block{margin-top:16px;border-top:1px dashed var(--artifact-border);padding-top:14px}
+.wash-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:.8rem;font-weight:700;color:var(--artifact-text-soft);text-transform:uppercase;letter-spacing:.04em}
+.wash-check{font-size:.8rem;font-weight:600;text-transform:none;letter-spacing:0;color:var(--artifact-text-soft)}
+.wash-check.ok{color:var(--artifact-green)}
+.wash-check.bad{color:var(--artifact-red)}
+.wash-head .btn{margin-left:auto;padding:6px 11px;font-size:.78rem}
+.wash-row{display:grid;grid-template-columns:1fr 170px 42px;gap:10px;margin-bottom:8px}
+.wash-row .w-del{padding:8px 0;justify-content:center;color:var(--artifact-text-soft)}
+.wash-row .w-del:hover{border-color:var(--artifact-red);color:var(--artifact-red)}
+.entry-actions{margin-top:16px}
+.lav-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+@media(max-width:640px){.lav-head .btn{width:100%;justify-content:center;padding:12px}}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--artifact-border)}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--artifact-text-soft);font-weight:700}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tfoot td{font-weight:700;border-top:2px solid var(--artifact-border)}
+.table-wrap{overflow:auto;max-height:520px;border:1px solid var(--artifact-border);border-radius:var(--artifact-radius)}
+.empty{text-align:center;color:var(--artifact-text-soft);padding:40px;font-size:.9rem}
+.badge-lock{font-size:.68rem;color:var(--artifact-text-soft);background:var(--artifact-surface-2);border:1px solid var(--artifact-border);padding:2px 7px;border-radius:999px;margin-left:6px}
+.badge-val{font-size:.68rem;color:var(--artifact-red);background:var(--artifact-red-soft);border:1px solid var(--artifact-red);padding:2px 7px;border-radius:999px;margin-left:6px;font-weight:700}
+.badge-net{font-size:.66rem;color:var(--artifact-green);background:var(--artifact-green-soft);border:1px solid var(--artifact-green);padding:1px 6px;border-radius:999px;font-weight:700;margin-right:4px}
+.badge-assign{font-size:.68rem;color:var(--artifact-amber);background:rgba(184,134,11,.12);border:1px solid var(--artifact-amber);padding:2px 7px;border-radius:999px;margin-left:6px;font-weight:700}
+.mini-btn{font:inherit;font-size:.7rem;font-weight:700;border:1px solid var(--artifact-amber);color:var(--artifact-amber);background:rgba(184,134,11,.12);padding:3px 9px;border-radius:999px;cursor:pointer;margin-left:6px;white-space:nowrap}
+.mini-btn:hover{background:var(--artifact-amber);color:#fff}
+.mini-btn.red{border-color:var(--artifact-red);color:var(--artifact-red);background:var(--artifact-red-soft)}
+.mini-btn.red:hover{background:var(--artifact-red);color:#fff}
+.modal .wash-row{grid-template-columns:1fr 110px 40px}
+.modal #assignWashersList{margin-bottom:4px}
+.park-col{color:var(--artifact-teal);font-weight:600}
+.debt-col{color:var(--artifact-red);font-weight:700}
+.debt-who{display:block;font-size:.72rem;color:var(--artifact-text-soft);font-weight:400;text-align:right}
+tr.has-debt{background:var(--artifact-red-soft)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.toolbar .grow{margin-left:auto}
+.hint{font-size:.82rem;color:var(--artifact-text-soft);background:var(--artifact-accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:20px}
+.setbar{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--artifact-text-soft);margin-bottom:18px;flex-wrap:wrap}
+.setbar input{width:80px}
+.cloud{font-size:.74rem;font-weight:700;padding:6px 11px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--artifact-border)}
+.cloud.on{color:var(--artifact-green);background:var(--artifact-green-soft);border-color:var(--artifact-green)}
+.cloud.off{color:var(--artifact-red);background:var(--artifact-red-soft);border-color:var(--artifact-red)}
+.cloud.wait{color:var(--artifact-text-soft);background:var(--artifact-surface-2)}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-back.open{display:flex}
+.modal{background:var(--artifact-surface);border:1px solid var(--artifact-border);border-radius:var(--artifact-radius);box-shadow:var(--artifact-shadow);width:100%;max-width:420px;padding:22px}
+.modal h3{margin:0 0 4px;font-size:1.05rem}
+.modal p.sub{margin:0 0 16px;font-size:.82rem;color:var(--artifact-text-soft)}
+.modal form{display:grid;gap:12px}
+.modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+.bell{position:relative}
+.bell .dot{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--artifact-red);color:#fff;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid var(--artifact-background)}
+.btn.bell.hasnew{border-color:var(--artifact-red);color:var(--artifact-red);background:var(--artifact-red-soft);font-weight:800;animation:bellshake .8s infinite}
+.btn.bell.hasnew .bell-ico{display:inline-block;transform-origin:50% 0;animation:bellring 1s infinite}
+@keyframes bellshake{0%,100%{transform:translateX(0)}15%{transform:translateX(-3px)}30%{transform:translateX(3px)}45%{transform:translateX(-3px)}60%{transform:translateX(2px)}75%{transform:translateX(-2px)}}
+@keyframes bellring{0%,60%,100%{transform:rotate(0)}10%{transform:rotate(18deg)}20%{transform:rotate(-16deg)}30%{transform:rotate(12deg)}40%{transform:rotate(-8deg)}50%{transform:rotate(4deg)}}
+@keyframes bellpulse{0%,100%{box-shadow:0 0 0 0 rgba(209,67,91,.35)}50%{box-shadow:0 0 0 8px rgba(209,67,91,0)}}
+.note-item{border:1px solid var(--artifact-border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--artifact-surface-2)}
+.note-item.new{border-color:var(--artifact-red);background:var(--artifact-red-soft)}
+.note-item .meta{font-size:.72rem;color:var(--artifact-text-soft);margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+.note-item .txt{font-size:.9rem;white-space:pre-wrap}
+.mkt-wrap{display:none}
+.mkt-wrap.show{display:block}
+.chk-row{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:600;color:var(--artifact-text);cursor:pointer}
+.chk-row input{width:auto;margin:0}
+.modal textarea{font:inherit;font-size:.9rem;padding:9px 11px;border:1px solid var(--artifact-border);border-radius:9px;background:var(--artifact-background);color:var(--artifact-text);min-height:80px;resize:vertical}
+.modal textarea:focus{outline:none;border-color:var(--artifact-accent)}
+@media(max-width:640px){
+  .shell{padding:0 12px 48px}
+  header.topbar{padding:12px 12px}
+  .topbar-inner{gap:10px}
+  .brand{width:100%;margin-right:0}
+  .brand h1{font-size:1.05rem}
+  .topbar-inner .btn{flex:1 1 calc(50% - 5px);justify-content:center;padding:10px 8px;font-size:.82rem}
+  .tabs{gap:8px}
+  .tab{flex:1;text-align:center}
+  .entry{grid-template-columns:1fr}
+  .entry-actions .btn.primary{width:100%;justify-content:center;padding:12px}
+  .wash-row{grid-template-columns:1fr 110px 40px}
+  .kpis{grid-template-columns:1fr 1fr;gap:12px}
+  .kpi{padding:14px}
+  .kpi .val{font-size:1.3rem}
+  .card{padding:16px}
+  .chart{height:260px}
+  .card.tall .chart{height:300px}
+  table{font-size:.82rem}
+  th,td{padding:8px 9px}
+  .table-wrap table{min-width:880px}
+  .setbar{font-size:.82rem}
+  .setbar input{width:70px}
+}
+@media(max-width:380px){
+  .kpis{grid-template-columns:1fr}
+}
+.warn{color:var(--artifact-red);font-weight:700}
+.section-title{font-size:1.15rem;margin:0 0 4px}
+.section-sub{color:var(--artifact-text-soft);font-size:.88rem;margin:0 0 20px}
+.pos{color:var(--artifact-green)}.neg{color:var(--artifact-red)}
+@media print{
+  header.topbar,.tabs,#entryForm,.toolbar,.btn,button,.setbar,.modal-back{display:none!important}
+  .view{display:block!important;break-inside:avoid;margin-bottom:24px}
+  body{background:#fff;padding:.4in .6in;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .card,.kpi{break-inside:avoid;box-shadow:none;border:1px solid rgba(0,0,0,.1)}
+  .chart{height:240px!important}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><h1>Tu Lavado <b>VIP</b> · Contabilidad</h1><span>Cierre diario · Sincronizado en la nube (Firestore)</span></div>
+    <span id="cloudStatus" class="cloud wait">Conectando...</span>
+    <button class="btn primary" onclick="openPark()">＋ Registrar parqueadero</button>
+    <button class="btn" onclick="openCobro()">＄ Cobrar deuda</button>
+    <button class="btn bell" id="btnNotas" onclick="openNotas()"><span class="bell-ico">🔔</span> Pendientes<span class="dot" id="notasDot" style="display:none">0</span></button>
+    <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
+    <button class="btn" onclick="document.getElementById('importFile').click()">Importar Excel</button>
+    <button class="btn" onclick="exportExcel()">Exportar Excel</button>
+    <button class="btn ghost" onclick="downloadTemplate()">Plantilla</button>
+  </div>
+</header>
+
+<div class="shell">
+  <div class="tabs">
+    <div class="tab active" data-view="cierre">Cierre diario</div>
+    <div class="tab" data-view="resumen">Resumen</div>
+    <div class="tab" data-view="lavadores">Lavadores</div>
+  </div>
+
+  <!-- CIERRE DIARIO -->
+  <section class="view active" id="cierre">
+    <h2 class="section-title">Registrar el día</h2>
+    <p class="section-sub">Agrega cuánto se hizo (efectivo + cuenta) y los gastos del día. Abajo asigna cuánto hizo cada lavador: la suma debe cuadrar exactamente con efectivo + cuenta. Si alguien quedó debiendo, el día quedará <b class="warn">en validación</b> (no cerrado) hasta que se cierren esas cuentas. El parqueadero se registra aparte con el botón de arriba.</p>
+
+    <div class="setbar">
+      <span>% que se quedan los lavadores:</span>
+      <input type="number" id="commPct" min="0" max="100" step="1" value="35">
+      <span>-> el negocio se queda con <b id="bizPctLbl">65%</b>.</span>
+    </div>
+
+    <div class="card" style="margin-bottom:22px">
+      <form id="entryForm">
+        <div class="entry">
+          <label class="field">Fecha<input type="date" id="fDate" required></label>
+          <label class="field">Efectivo (caja)<input type="text" inputmode="numeric" id="fCash" placeholder="0" required autocomplete="off"></label>
+          <label class="field">En cuenta (virtual)<input type="text" inputmode="numeric" id="fVirtual" placeholder="0" required autocomplete="off"></label>
+          <label class="field">Gastos del día<input type="text" inputmode="numeric" id="fExpense" placeholder="0" autocomplete="off"></label>
+          <label class="field">¿A qué se pagó?<input id="fNote" placeholder="Insumos, servicios..."></label>
+          <label class="field debt">Se quedó debiendo<input type="text" inputmode="numeric" id="fDebt" placeholder="0" autocomplete="off"></label>
+          <label class="field debt">¿Quién quedó debiendo?<input id="fDebtWho" placeholder="Juan, Andrés..." autocomplete="off"></label>
+          <label class="field" style="flex-direction:row;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="fDebtNotShared" style="width:auto;flex:none"> Esta deuda NO es compartida con los lavadores (100% del negocio)</label>
+          <label class="field debt" id="fDebtReasonWrap" style="display:none">¿A qué se debe la deuda?<input id="fDebtReason" placeholder="Parqueadero, venta, etc." autocomplete="off"></label>
+          <label class="field"><span class="chk-row"><input type="checkbox" id="fMkt"> ¿Cliente agendado por marketing?</span></label>
+          <label class="field mkt-wrap" id="fMktWrap">Valor por marketing<input type="text" inputmode="numeric" id="fMktValue" placeholder="0" autocomplete="off"></label>
+        </div>
+
+        <div class="washers-block">
+          <div class="wash-head">
+            <span>Lavadores — ¿cuánto hizo cada uno?</span>
+            <span class="wash-check" id="washCheck"></span>
+            <button type="button" class="btn" id="addWasher">＋ Agregar lavador</button>
+          </div>
+          <div id="washersList"></div>
+        </div>
+
+        <div class="entry-actions">
+          <button class="btn primary" type="submit">Cerrar día</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Fecha</th>
+          <th class="num">Efectivo</th>
+          <th class="num">En cuenta</th>
+          <th class="num">Parqueadero</th>
+          <th class="num">Total del día</th>
+          <th class="num">Lavadores (<span class="cpct">35</span>%)</th>
+          <th class="num">Negocio (<span class="bpct">65</span>%)</th>
+          <th class="num">Gastos</th>
+          <th>Detalle</th>
+          <th class="num">Debe</th>
+          <th class="num">Utilidad neta</th>
+        </tr></thead>
+        <tbody id="dayBody"></tbody>
+        <tfoot id="dayFoot"></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- RESUMEN -->
+  <section class="view" id="resumen">
+    <div class="kpis">
+      <div class="kpi accent"><div class="lbl">Total generado</div><div class="val" id="kTotal">$0</div><div class="sub">lavados + parqueadero</div></div>
+      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pendientes + cobradas en efectivo</div></div>
+      <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">virtual + deudas cobradas en tarjeta</div></div>
+      <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
+      <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
+      <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
+      <div class="kpi"><div class="lbl">Utilidad negocio</div><div class="val" id="kNet">$0</div><div class="sub">negocio - gastos</div></div>
+      <div class="kpi accent"><div class="lbl">Ingresos por marketing</div><div class="val" id="kMkt">$0</div><div class="sub">clientes agendados por marketing</div></div>
+    </div>
+
+    <h3 class="section-title" style="font-size:1rem;margin:0 0 12px">Estado de deudas</h3>
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Total sin deuda</div><div class="val" id="kNoDebt">$0</div><div class="sub">plata que tenemos hoy</div></div>
+      <div class="kpi green"><div class="lbl">Total con deuda</div><div class="val" id="kWithDebt">$0</div><div class="sub">si pagan todo</div></div>
+      <div class="kpi red"><div class="lbl">Nos falta (por cobrar)</div><div class="val" id="kDebt">$0</div><div class="sub">deudas no pagadas</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card"><h3>Total generado por día</h3><div class="chart" id="chartDay"></div></div>
+      <div class="card"><h3>¿A dónde va la plata?</h3><div class="chart" id="chartSplit"></div></div>
+    </div>
+    <div class="card tall"><h3>Utilidad del negocio acumulada</h3><div class="chart" id="chartNet"></div></div>
+  </section>
+
+  <!-- LAVADORES -->
+  <section class="view" id="lavadores">
+    <div class="lav-head">
+      <div style="margin-right:auto">
+        <h2 class="section-title">Pago a lavadores</h2>
+        <p class="section-sub" style="margin:0">Cuánto se le debe pagar a cada lavador (su comisión del <span class="cpct">35</span>%). Cuando les pagues, usa el botón: el pendiente vuelve a cero, tus ganancias no cambian y queda el registro del pago.</p>
+      </div>
+      <button class="btn" onclick="openVale()">＄ Dar vale</button>
+      <button class="btn primary" onclick="payWashers()">✓ Ya pagué a los lavadores</button>
+      <button class="btn ghost" onclick="undoPay()" style="margin-left:8px">↩ Deshacer último pago</button>
+      <button class="btn ghost" onclick="resetPay()" style="margin-left:8px;color:var(--artifact-red);border-color:var(--artifact-red)">⟲ Resetear pagos</button>
+    </div>
+    <div class="kpis">
+      <div class="kpi amber"><div class="lbl">Por pagar ahora</div><div class="val" id="wPay">$0</div><div class="sub">neto (comisión − vales)</div></div>
+      <div class="kpi red"><div class="lbl">Vales pendientes</div><div class="val" id="wVale">$0</div><div class="sub">adelantos por descontar</div></div>
+      <div class="kpi green"><div class="lbl">Ya pagado (histórico)</div><div class="val" id="wPaidTot">$0</div><div class="sub">total pagado</div></div>
+      <div class="kpi teal"><div class="lbl">Pagado este mes</div><div class="val" id="wPaidMonth">$0</div><div class="sub">mes actual</div></div>
+    </div>
+    <div class="table-wrap" style="margin-bottom:24px">
+      <table>
+        <thead><tr><th>Lavador</th><th class="num">Produjo (total)</th><th class="num">%</th><th class="num">Comisión</th><th class="num">Vales</th><th class="num">Por pagar (neto)</th><th class="num">Ya pagado</th></tr></thead>
+        <tbody id="washBody"></tbody>
+        <tfoot id="washFoot"></tfoot>
+      </table>
+    </div>
+    <div class="grid-2">
+      <div class="card"><h3>Plata por pagar por lavador</h3><div class="chart" id="chartWash"></div></div>
+      <div class="card"><h3>Historial de pagos</h3>
+        <div class="table-wrap" style="max-height:340px">
+          <table>
+            <thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Total</th></tr></thead>
+            <tbody id="pagosBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="card"><h3>Vales entregados (adelantos)</h3>
+      <p class="section-sub" style="margin:0 0 12px">Cada vale se le RESTA al lavador de lo que hay que pagarle al cierre. Cuando marcas "Ya pagué a los lavadores", los vales pendientes quedan como descontados.</p>
+      <div class="table-wrap" style="max-height:340px">
+        <table>
+          <thead><tr><th>Fecha</th><th>Lavador</th><th class="num">Valor</th><th>Nota</th><th>Estado</th></tr></thead>
+          <tbody id="valesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- MODAL PARQUEADERO -->
+<div class="modal-back" id="parkModal">
+  <div class="modal">
+    <h3>Registrar parqueadero</h3>
+    <p class="sub">Se suma al día indicado. Puedes registrar varias veces el mismo día. El % es lo que se llevan los lavadores (normalmente 0%).</p>
+    <form id="parkForm">
+      <label class="field">Fecha<input type="date" id="pDate" required></label>
+      <label class="field">Valor<input type="text" inputmode="numeric" id="pValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">% lavadores<input type="number" id="pPct" step="1" min="0" max="100" value="0"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closePark()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL ASIGNAR LAVADORES -->
+<div class="modal-back" id="assignModal">
+  <div class="modal">
+    <h3 id="assignTitle">Asignar lavadores</h3>
+    <p class="sub" id="assignTarget"></p>
+    <form id="assignForm">
+      <div id="assignWashersList"></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 2px">
+        <span class="wash-check" id="assignCheck"></span>
+        <button type="button" class="btn" id="assignAddWasher" style="margin-left:auto;padding:6px 11px;font-size:.78rem">＋ Agregar lavador</button>
+      </div>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeAssign()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar asignación</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL COBRAR DEUDA -->
+<div class="modal-back" id="cobroModal">
+  <div class="modal">
+    <h3>Cobrar deuda</h3>
+    <p class="sub">Registra un pago de una deuda pendiente y asígnalo a un día. Cuando la deuda de ese día llegue a cero, el día queda consolidado y desaparece la línea roja.</p>
+    <form id="cobroForm">
+      <label class="field">Día con deuda<select id="cDay" required></select></label>
+      <p class="sub" id="cInfo" style="margin:-4px 0 0"></p>
+      <label class="field">Valor cobrado<input type="text" inputmode="numeric" id="cValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">¿Quién pagó?<input id="cWho" placeholder="Juan..." autocomplete="off"></label>
+      <label class="field">¿Cómo pagó?<select id="cMethod"><option value="efectivo">Efectivo (caja)</option><option value="tarjeta">Tarjeta / cuenta (virtual)</option></select></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeCobro()">Cancelar</button>
+        <button type="submit" class="btn primary">Registrar cobro</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL DAR VALE -->
+<div class="modal-back" id="valeModal">
+  <div class="modal">
+    <h3>Dar vale a un lavador</h3>
+    <p class="sub">Un vale es un adelanto que le entregas a un lavador. Se le RESTA de lo que hay que pagarle al cierre. No cambia tus ganancias: esa plata ya era del lavador.</p>
+    <form id="valeForm">
+      <label class="field">Lavador<select id="vWasher" required></select></label>
+      <label class="field">Valor del vale<input type="text" inputmode="numeric" id="vValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">Fecha<input type="date" id="vDate" required></label>
+      <label class="field">Nota (opcional)<input id="vNote" placeholder="Motivo..." autocomplete="off"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeVale()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar vale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL NOTAS -->
+<div class="modal-back" id="notasModal">
+  <div class="modal" style="max-width:520px">
+    <h3>🔔 Pendientes</h3>
+    <p class="sub">Pendientes / cosas por hacer para los administradores. Mientras haya al menos un pendiente sin leer, el botón de arriba se sacude 🔔 sin parar para que nadie se lo pierda. Todo queda guardado en la nube para revisarlo a fin de mes.</p>
+    <form id="notasForm">
+      <label class="field">Autor<input id="nAutor" placeholder="Tu nombre..." autocomplete="off"></label>
+      <label class="field">Nota<textarea id="nText" placeholder="Escribe la nota..."></textarea></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeNotas()">Cerrar</button>
+        <button type="button" class="btn primary" onclick="markNotesSeen()">✓ Ya lo leí (dejar de molestar)</button>
+        <button type="submit" class="btn">＋ Guardar pendiente</button>
+      </div>
+    </form>
+    <div style="margin-top:16px;max-height:320px;overflow:auto" id="notasList"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ================= FIREBASE ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCE-YpoFTjGiawfkNkRwMYjWnYSgWcnGTE",
+  authDomain: "tu-lavado-vip.firebaseapp.com",
+  projectId: "tu-lavado-vip",
+  storageBucket: "tu-lavado-vip.firebasestorage.app",
+  messagingSenderId: "807461747371",
+  appId: "1:807461747371:web:37bdbc9cb2fa2ed7d1d5ee",
+  measurementId: "G-X83M4DFXY1"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const COL_DAYS = "cierres";          // 1 documento por día, id = fecha (YYYY-MM-DD)
+const MAX_W = 5;                     // máximo de lavadores por día
+
+function setStatus(state, msg){
+  const el = document.getElementById("cloudStatus");
+  if(!el) return;
+  el.textContent = msg;
+  el.className = "cloud " + state;
+}
+
+/* ================= STATE ================= */
+const COP = new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
+const fmt = n => COP.format(Math.round(n||0));
+const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleString('es-CO') : ''; };   // 1200000 -> "1.200.000"
+const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
+const digits = v => +(''+v).replace(/\D/g,'')||0;
+function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
+['fCash','fVirtual','fExpense','fDebt','fMktValue','pValue','cValue','vValue'].forEach(attachSep);
+let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,debt,debtWho,washers:[{name,amount}],commPct,closed}
+let commPct = 35;
+let roster = ['Lavador 1','Lavador 2','Lavador 3'];  // lista fija de lavadores (persistida)
+let pagos = [];                                        // registros de pago a lavadores
+let cobros = [];                                       // registros de cobro de deudas
+let vales = [];                                        // adelantos (vales) entregados a lavadores
+let notas = [];                                        // notas de administradores (revisión fin de mes)
+let charts = {};
+
+/* ---------- per-day math ---------- */
+const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;  // cualquier valor (texto o número) -> número
+const wash  = d => num(d.cash)+num(d.virtual);
+const park  = d => num(d.park);
+const total = d => wash(d)+park(d);
+const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;  // lavadores
+const biz   = d => total(d)-comm(d);                                               // negocio
+const net   = d => biz(d)-num(d.expense);                                          // utilidad neta
+const debt  = d => num(d.debt);                                                    // deuda original registrada
+const mktVal = d => d.mkt ? num(d.mktValue) : 0;                                    // ingreso atribuido a marketing ese día
+const debtOut = d => Math.max(0,num(d.debt)-num(d.debtPaid));                       // deuda pendiente por cobrar
+const isSharedDebt = d => d.debtShared!==false;                                    // por defecto la deuda es compartida con lavadores
+/* suma de cobros de deudas NO compartidas (100% negocio): son ganancia neta al cobrarse */
+function collectedNonShared(){
+  return cobros.reduce((a,c)=>{ const d=days.find(x=>x.date===c.dayDate); return a + ((d && d.debtShared===false)? num(c.amount):0); },0);
+}
+const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
+const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
+
+/* ---------- Firestore writes ---------- */
+async function closeDay(d){
+  await setDoc(doc(db, COL_DAYS, d.date), {
+    date:d.date, cash:d.cash, virtual:d.virtual, expense:d.expense,
+    note:d.note, debt:d.debt||0, debtWho:d.debtWho||'',
+    debtShared:(d.debtShared!==false), debtReason:d.debtReason||'',
+    mkt:!!d.mkt, mktValue:d.mktValue||0,
+    washers:d.washers||[],
+    commPct:d.commPct, closed:true, updatedAt:Date.now()
+  }, { merge:true });
+}
+async function addPark(date, value, pct){
+  const ex = days.find(d=>d.date===date);
+  await setDoc(doc(db, COL_DAYS, date), {
+    date, park:((ex&&ex.park)||0)+value, parkPct:pct, updatedAt:Date.now()
+  }, { merge:true });
+}
+async function saveCfg(){ await setDoc(doc(db, "config", "general"), {commPct}); }
+async function saveRoster(){ try{ await setDoc(doc(db, "config", "lavadores"), {names:roster}); }catch(e){} }
+function currentMonth(){ return new Date().toISOString().slice(0,7); }
+
+/* ---------- Firestore realtime listeners ---------- */
+onSnapshot(collection(db, COL_DAYS),
+  snap => {
+    days = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    setStatus("on", "Conectado");
+    renderAll();
+  },
+  err => { setStatus("off", "Sin conexión (" + err.code + ")"); }
+);
+onSnapshot(doc(db, "config", "general"),
+  snap => {
+    if (snap.exists()){
+      const saved = +snap.data().commPct;
+      // El default siempre es 35%. Un 0/valor invalido guardado no debe pisar el default.
+      commPct = (Number.isFinite(saved) && saved > 0) ? saved : 35;
+      commInput.value = commPct;
+      refreshPctLabels();
+      renderAll();
+    }
+  },
+  () => {}
+);
+/* lista fija de lavadores */
+onSnapshot(doc(db, "config", "lavadores"),
+  snap => {
+    if (snap.exists() && Array.isArray(snap.data().names) && snap.data().names.length){
+      roster = snap.data().names.slice(0, MAX_W);
+      if (isFreshForm()) initWashers();   // si el formulario está en blanco, recarga los nombres fijos
+    }
+  },
+  () => {}
+);
+/* registros de pago a lavadores */
+onSnapshot(collection(db, "pagos"),
+  snap => {
+    pagos = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    renderWashersDash();
+    if (document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+  },
+  () => {}
+);
+/* registros de cobro de deudas */
+onSnapshot(collection(db, "cobros"),
+  snap => { cobros = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderAll(); },
+  () => {}
+);
+/* registros de vales (adelantos a lavadores) */
+onSnapshot(collection(db, "vales"),
+  snap => {
+    vales = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    renderWashersDash();
+    if (document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+  },
+  () => {}
+);
+/* notas de administradores */
+onSnapshot(collection(db, "notas"),
+  snap => { notas = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderNotasBadge(); if(document.getElementById('notasModal').classList.contains('open')) renderNotas(); },
+  () => {}
+);
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); document.getElementById(t.dataset.view).classList.add('active');
+  if(t.dataset.view==='resumen') setTimeout(renderCharts,50);
+  if(t.dataset.view==='lavadores'){ renderWashersDash(); setTimeout(renderWashChart,50); }
+});
+
+/* ---------- settings ---------- */
+const commInput=document.getElementById('commPct');
+commInput.value=commPct;
+function refreshPctLabels(){
+  document.getElementById('bizPctLbl').textContent=(100-commPct)+'%';
+  document.querySelectorAll('.cpct').forEach(e=>e.textContent=commPct);
+  document.querySelectorAll('.bpct').forEach(e=>e.textContent=100-commPct);
+}
+commInput.onchange=()=>{ commPct=Math.min(100,Math.max(0,+commInput.value||0)); refreshPctLabels(); renderAll(); saveCfg(); };
+
+/* ================= LAVADORES (formulario) ================= */
+const washersList=document.getElementById('washersList');
+function washerRowHTML(name,amount){
+  return `<div class="wash-row">
+    <input class="w-name" placeholder="Nombre del lavador" value="${(name||'').replace(/"/g,'&quot;')}">
+    <input class="w-amt" inputmode="numeric" placeholder="0" value="${amount!=null&&amount!==''?sep(amount):''}">
+    <button type="button" class="btn ghost w-del" title="Quitar">✕</button>
+  </div>`;
+}
+function washerRows(){ return [...washersList.querySelectorAll('.wash-row')]; }
+function bindWasherRow(row){
+  const amt=row.querySelector('.w-amt');
+  amt.addEventListener('input',()=>{ amt.value=sep(amt.value); updateWashCheck(); });
+  row.querySelector('.w-name').addEventListener('change', syncRosterFromForm);
+  row.querySelector('.w-del').onclick=()=>{ if(washerRows().length<=1){ alert('Debe quedar al menos un lavador.'); return; } row.remove(); updateWashCheck(); syncRosterFromForm(); };
+}
+/* Guarda en Firebase la lista fija de lavadores (nombres actuales del formulario). */
+function syncRosterFromForm(){
+  const names=washerRows().map(r=>r.querySelector('.w-name').value.trim()).filter(Boolean);
+  if(names.length){ roster=names.slice(0,MAX_W); saveRoster(); }
+}
+/* True si el formulario está en blanco y la fecha no tiene registro (para recargar nombres fijos). */
+function isFreshForm(){
+  const ex=days.find(d=>d.date===fDate.value);
+  if(ex) return false;
+  return washersSum()===0 && numVal(fCash)===0 && numVal(fVirtual)===0;
+}
+function addWasherRow(name,amount){
+  if(washerRows().length>=MAX_W){ alert('Por ahora el máximo es '+MAX_W+' lavadores.'); return; }
+  washersList.insertAdjacentHTML('beforeend', washerRowHTML(name!=null?name:('Lavador '+(washerRows().length+1)), amount));
+  bindWasherRow(washersList.lastElementChild);
+}
+function initWashers(list){
+  washersList.innerHTML='';
+  const arr=(Array.isArray(list)&&list.length)?list:roster.map(n=>({name:n}));
+  arr.slice(0,MAX_W).forEach(w=>addWasherRow(w.name, w.amount));
+  updateWashCheck();
+}
+function readWashers(){
+  return washerRows().map(r=>({name:r.querySelector('.w-name').value.trim(), amount:digits(r.querySelector('.w-amt').value)}))
+                     .filter(w=>w.name||w.amount);
+}
+function washersSum(){ return washerRows().reduce((a,r)=>a+digits(r.querySelector('.w-amt').value),0); }
+function updateWashCheck(){
+  const el=document.getElementById('washCheck'); if(!el) return;
+  const target=numVal(fCash)+numVal(fVirtual);
+  const s=washersSum(), diff=target-s;
+  if(target===0 && s===0){ el.textContent=''; el.className='wash-check'; return; }
+  if(diff===0){ el.textContent='✓ Cuadra con efectivo + cuenta ('+fmt(s)+')'; el.className='wash-check ok'; }
+  else { el.textContent=(diff>0?'Faltan por asignar ':'Sobran ')+fmt(Math.abs(diff))+' — asignado '+fmt(s)+' de '+fmt(target); el.className='wash-check bad'; }
+}
+document.getElementById('addWasher').onclick=()=>{ addWasherRow(); syncRosterFromForm(); };
+['fCash','fVirtual'].forEach(id=>document.getElementById(id).addEventListener('input',updateWashCheck));
+
+/* ---------- marketing: mostrar/ocultar el valor según el checkbox ---------- */
+function toggleMkt(){ document.getElementById('fMktWrap').classList.toggle('show', document.getElementById('fMkt').checked); }
+document.getElementById('fMkt').addEventListener('change',toggleMkt);
+/* ---------- deuda: mostrar campo "a qué se debe" cuando NO es compartida ---------- */
+function toggleDebtShared(){ document.getElementById('fDebtReasonWrap').style.display = document.getElementById('fDebtNotShared').checked ? 'flex' : 'none'; }
+document.getElementById('fDebtNotShared').addEventListener('change',toggleDebtShared);
+
+/* ---------- form cierre ---------- */
+document.getElementById('fDate').valueAsDate=new Date();
+/* Si el día seleccionado quedó en validación (con deuda), precargamos sus datos para poder cerrarlo. */
+document.getElementById('fDate').addEventListener('change',()=>{
+  const ex=days.find(d=>d.date===fDate.value);
+  if(ex && !isLocked(ex)){
+    // Día ya registrado y todavía editable (con deuda o sin lavadores asignados): precargamos todo para completarlo.
+    fCash.value=sep(ex.cash||0); fVirtual.value=sep(ex.virtual||0);
+    fExpense.value=sep(ex.expense||0); fNote.value=ex.note||'';
+    fDebt.value=sep(ex.debt||0); fDebtWho.value=ex.debtWho||'';
+    document.getElementById('fDebtNotShared').checked=(ex.debtShared===false); fDebtReason.value=ex.debtReason||''; toggleDebtShared();
+    document.getElementById('fMkt').checked=!!ex.mkt; fMktValue.value=ex.mktValue?sep(ex.mktValue):''; toggleMkt();
+    initWashers(ex.washers);
+    updateWashCheck();
+  }
+});
+document.getElementById('entryForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(!fDate.value){ alert('Selecciona una fecha.'); return; }
+  const ex = days.find(d=>d.date===fDate.value);
+  if(isLocked(ex)){
+    alert('El día '+fDate.value+' ya está cerrado, sin deudas y con lavadores asignados. Un cierre completo no se puede modificar.');
+    return;
+  }
+  const washers=readWashers();
+  const sumW=washers.reduce((a,w)=>a+w.amount,0);
+  const target=numVal(fCash)+numVal(fVirtual);
+  if(target>0 && sumW!==target){
+    alert('Debes asignar cuánto hizo cada lavador.\n\nLa suma de los lavadores ('+fmt(sumW)+') tiene que ser exactamente igual a efectivo + cuenta ('+fmt(target)+').');
+    return;
+  }
+  const mktOn=document.getElementById('fMkt').checked;
+  if(mktOn && numVal(fMktValue)<=0){ alert('Marcaste que hubo cliente por marketing. Escribe el valor de marketing.'); return; }
+  const rec={date:fDate.value,cash:numVal(fCash),virtual:numVal(fVirtual),
+    expense:numVal(fExpense),note:fNote.value.trim(),
+    debt:numVal(fDebt),debtWho:fDebtWho.value.trim(),
+    debtShared:!document.getElementById('fDebtNotShared').checked, debtReason:fDebtReason.value.trim(),
+    mkt:mktOn, mktValue:mktOn?numVal(fMktValue):0,
+    washers, commPct:commPct};
+  try{
+    await closeDay(rec);
+    syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
+    fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
+    document.getElementById('fDebtNotShared').checked=false; fDebtReason.value=''; toggleDebtShared();
+    document.getElementById('fMkt').checked=false; fMktValue.value=''; toggleMkt();
+    initWashers();
+  }catch(err){ alert('No se pudo guardar en la nube: '+err.message); }
+};
+
+/* ---------- modal parqueadero ---------- */
+function openPark(){ document.getElementById('pDate').valueAsDate=new Date(); document.getElementById('parkModal').classList.add('open'); }
+function closePark(){ document.getElementById('parkModal').classList.remove('open'); }
+document.getElementById('parkModal').addEventListener('click',e=>{ if(e.target.id==='parkModal') closePark(); });
+document.getElementById('parkForm').onsubmit=async e=>{
+  e.preventDefault();
+  const date=pDate.value; if(!date){ alert('Selecciona una fecha.'); return; }
+  const val=numVal(pValue);
+  const pct=Math.min(100,Math.max(0,+pPct.value||0));
+  try{
+    await addPark(date, val, pct);
+    pValue.value=''; pPct.value='0'; closePark();
+  }catch(err){ alert('No se pudo guardar el parqueadero: '+err.message); }
+};
+
+/* ---------- modal ASIGNAR LAVADORES (para días ya cerrados sin desglose) ---------- */
+let assignDate=null;
+const assignList=document.getElementById('assignWashersList');
+function assignRows(){ return [...assignList.querySelectorAll('.wash-row')]; }
+function assignSum(){ return assignRows().reduce((a,r)=>a+digits(r.querySelector('.w-amt').value),0); }
+function updateAssignCheck(){
+  const el=document.getElementById('assignCheck'); if(!el) return;
+  const d=days.find(x=>x.date===assignDate); const target=d?wash(d):0;
+  const s=assignSum(), diff=target-s;
+  if(diff===0 && target>0){ el.textContent='✓ Cuadra con efectivo + cuenta ('+fmt(s)+')'; el.className='wash-check ok'; }
+  else { el.textContent=(diff>0?'Faltan por asignar ':'Sobran ')+fmt(Math.abs(diff))+' — asignado '+fmt(s)+' de '+fmt(target); el.className='wash-check bad'; }
+}
+function assignAddRow(name,amount){
+  if(assignRows().length>=MAX_W){ alert('Por ahora el máximo es '+MAX_W+' lavadores.'); return; }
+  assignList.insertAdjacentHTML('beforeend', washerRowHTML(name!=null?name:('Lavador '+(assignRows().length+1)), amount));
+  const row=assignList.lastElementChild;
+  const amt=row.querySelector('.w-amt');
+  amt.addEventListener('input',()=>{ amt.value=sep(amt.value); updateAssignCheck(); });
+  row.querySelector('.w-del').onclick=()=>{ if(assignRows().length<=1){ alert('Debe quedar al menos un lavador.'); return; } row.remove(); updateAssignCheck(); };
+}
+function assignWashers(date){
+  const d=days.find(x=>x.date===date);
+  if(!d){ alert('Día no encontrado.'); return; }
+  if(hasWashers(d)){ alert('Este día ya tiene los lavadores asignados y no se puede volver a editar.'); return; }
+  assignDate=date;
+  document.getElementById('assignTitle').textContent='Asignar lavadores — '+date;
+  document.getElementById('assignTarget').textContent='La suma debe cuadrar con efectivo + cuenta de ese día: '+fmt(wash(d))+'.';
+  assignList.innerHTML='';
+  roster.slice(0,MAX_W).forEach(n=>assignAddRow(n));
+  updateAssignCheck();
+  document.getElementById('assignModal').classList.add('open');
+}
+function closeAssign(){ document.getElementById('assignModal').classList.remove('open'); assignDate=null; }
+document.getElementById('assignAddWasher').onclick=()=>assignAddRow();
+document.getElementById('assignModal').addEventListener('click',e=>{ if(e.target.id==='assignModal') closeAssign(); });
+document.getElementById('assignForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===assignDate); if(!d){ closeAssign(); return; }
+  const washers=assignRows().map(r=>({name:r.querySelector('.w-name').value.trim(), amount:digits(r.querySelector('.w-amt').value)})).filter(w=>w.name||w.amount);
+  const sumW=washers.reduce((a,w)=>a+w.amount,0);
+  const target=wash(d);
+  if(sumW!==target){
+    alert('No se puede guardar.\n\nLa suma de los lavadores ('+fmt(sumW)+') tiene que ser exactamente igual a efectivo + cuenta de ese día ('+fmt(target)+').');
+    return;
+  }
+  try{
+    await setDoc(doc(db,COL_DAYS,d.date),{washers,updatedAt:Date.now()},{merge:true});
+    closeAssign();   // al guardar, el letrero desaparece y el día queda bloqueado
+  }catch(err){ alert('No se pudo guardar: '+err.message); }
+};
+window.assignWashers=assignWashers;
+window.closeAssign=closeAssign;
+
+/* ---------- modal COBRAR DEUDA ---------- */
+function openCobro(preDate){
+  const list=days.filter(d=>debtOut(d)>0).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!list.length){ alert('No hay deudas pendientes por cobrar. Todos los días están consolidados.'); return; }
+  const sel=document.getElementById('cDay');
+  sel.innerHTML=list.map(d=>`<option value="${d.date}">${d.date} — debe ${fmt(debtOut(d))}${d.debtShared===false?' (100% negocio)':''}</option>`).join('');
+  if(preDate && list.some(d=>d.date===preDate)) sel.value=preDate;
+  cValue.value=''; cWho.value='';
+  updateCobroInfo();
+  document.getElementById('cobroModal').classList.add('open');
+}
+function updateCobroInfo(){
+  const d=days.find(x=>x.date===cDay.value);
+  document.getElementById('cInfo').textContent = d ? ('Deuda pendiente de ese día: '+fmt(debtOut(d))+(d.debtShared===false?' · 100% del negocio (sin comisión)'+(d.debtReason?' — '+d.debtReason:''):(d.debtWho?' · quedó debiendo: '+d.debtWho:''))) : '';
+}
+function closeCobro(){ document.getElementById('cobroModal').classList.remove('open'); }
+document.getElementById('cDay').addEventListener('change',updateCobroInfo);
+document.getElementById('cobroModal').addEventListener('click',e=>{ if(e.target.id==='cobroModal') closeCobro(); });
+document.getElementById('cobroForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===cDay.value); if(!d){ closeCobro(); return; }
+  const val=numVal(cValue), out=debtOut(d);
+  if(val<=0){ alert('Ingresa el valor cobrado.'); return; }
+  if(val>out){ alert('No puedes cobrar más de lo que deben.\n\nDeuda pendiente de ese día: '+fmt(out)+'.'); return; }
+  try{
+    const method=(document.getElementById('cMethod').value==='tarjeta')?'tarjeta':'efectivo';
+    await setDoc(doc(db,COL_DAYS,d.date),{debtPaid:(d.debtPaid||0)+val,updatedAt:Date.now()},{merge:true});
+    await addDoc(collection(db,'cobros'),{dayDate:d.date,amount:val,who:cWho.value.trim(),method:method,paidAt:new Date().toISOString().slice(0,10),createdAt:Date.now()});
+    closeCobro();
+  }catch(err){ alert('No se pudo registrar el cobro: '+err.message); }
+};
+window.openCobro=openCobro; window.closeCobro=closeCobro;
+
+/* ---------- vales (adelantos a lavadores) ---------- */
+function washerOptions(){
+  const set=new Set(roster.map(n=>(n||'').trim()).filter(Boolean));
+  days.forEach(d=>{ if(Array.isArray(d.washers)) d.washers.forEach(w=>{ const n=(w.name||'').trim(); if(n) set.add(n); }); });
+  return [...set];
+}
+function openVale(){
+  const sel=document.getElementById('vWasher');
+  sel.innerHTML=washerOptions().map(n=>`<option value="${n}">${n}</option>`).join('');
+  document.getElementById('vDate').valueAsDate=new Date();
+  vValue.value=''; vNote.value='';
+  document.getElementById('valeModal').classList.add('open');
+}
+function closeVale(){ document.getElementById('valeModal').classList.remove('open'); }
+document.getElementById('valeModal').addEventListener('click',e=>{ if(e.target.id==='valeModal') closeVale(); });
+document.getElementById('valeForm').onsubmit=async e=>{
+  e.preventDefault();
+  const washer=(vWasher.value||'').trim();
+  const val=numVal(vValue);
+  if(!washer){ alert('Selecciona un lavador.'); return; }
+  if(val<=0){ alert('Ingresa el valor del vale.'); return; }
+  try{
+    await addDoc(collection(db,'vales'),{washer,amount:val,note:vNote.value.trim(),valeAt:vDate.value||new Date().toISOString().slice(0,10),paid:false,valePaidAt:'',createdAt:Date.now()});
+    closeVale();
+  }catch(err){ alert('No se pudo guardar el vale: '+err.message); }
+};
+window.openVale=openVale; window.closeVale=closeVale;
+
+/* ================= NOTAS (administradores) ================= */
+function unseenNotas(){ return notas.filter(n=>!n.seen).length; }
+function renderNotasBadge(){
+  const dot=document.getElementById('notasDot'), btn=document.getElementById('btnNotas');
+  if(!dot||!btn) return;
+  const n=unseenNotas();
+  if(n>0){ dot.style.display='flex'; dot.textContent=n; btn.classList.add('hasnew'); }
+  else { dot.style.display='none'; btn.classList.remove('hasnew'); }
+}
+function openNotas(){ document.getElementById('notasModal').classList.add('open'); renderNotas(); }
+function closeNotas(){ document.getElementById('notasModal').classList.remove('open'); }
+document.getElementById('notasModal').addEventListener('click',e=>{ if(e.target.id==='notasModal') closeNotas(); });
+function renderNotas(){
+  const box=document.getElementById('notasList');
+  const list=[...notas].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  box.innerHTML = list.length ? list.map(n=>{
+    const f=(n.at||'')+(n.at&&n.autor?' · ':'')+(n.autor||'');
+    return `<div class="note-item ${n.seen?'':'new'}">
+      <div class="meta"><span>${f||'—'}</span>${n.seen?'':'<span class="badge-val">nueva</span>'}</div>
+      <div class="txt">${(n.text||'').replace(/</g,'&lt;')}</div></div>`;
+  }).join('') : '<div class="empty">No hay pendientes. Escribe el primero arriba.</div>';
+}
+document.getElementById('notasForm').onsubmit=async e=>{
+  e.preventDefault();
+  const text=document.getElementById('nText').value.trim();
+  if(!text){ alert('Escribe el pendiente.'); return; }
+  try{
+    await addDoc(collection(db,'notas'),{text,autor:document.getElementById('nAutor').value.trim(),at:new Date().toISOString().slice(0,10),seen:false,createdAt:Date.now()});
+    document.getElementById('nText').value='';
+  }catch(err){ alert('No se pudo guardar la nota: '+err.message); }
+};
+async function markNotesSeen(){
+  const pend=notas.filter(n=>!n.seen);
+  if(!pend.length){ alert('No hay pendientes nuevos por leer.'); return; }
+  try{ for(const n of pend){ await setDoc(doc(db,'notas',n.id),{seen:true},{merge:true}); } }
+  catch(err){ alert('No se pudo actualizar: '+err.message); }
+}
+window.openNotas=openNotas; window.closeNotas=closeNotas; window.markNotesSeen=markNotesSeen;
+
+/* ---------- render table ---------- */
+function renderDays(){
+  const rows=[...days].sort((a,b)=>b.date.localeCompare(a.date));
+  const b=document.getElementById('dayBody');
+  b.innerHTML = rows.length? rows.map(d=>{
+    const out=debtOut(d);
+    const hasDebt=out>0;
+    const needW = d.closed && !hasDebt && !hasWashers(d) && wash(d)>0;
+    const badge = hasDebt ? ' <span class="badge-val">en validación</span>'
+                : needW   ? ' <button type="button" class="mini-btn" onclick="assignWashers(\''+d.date+'\')">＋ Asignar lavadores</button>'
+                : (d.closed?' <span class="badge-lock">cerrado</span>':'');
+    return `<tr class="${hasDebt?'has-debt':''}">
+    <td>${d.date}${badge}</td>
+    <td class="num">${fmt(d.cash)}</td>
+    <td class="num">${fmt(d.virtual)}</td>
+    <td class="num park-col">${fmt(park(d))}</td>
+    <td class="num">${fmt(total(d))}</td>
+    <td class="num">${fmt(comm(d))}</td>
+    <td class="num">${fmt(biz(d))}</td>
+    <td class="num">${fmt(d.expense)}</td>
+    <td>${d.note||''}</td>
+    <td class="num debt-col">${hasDebt?fmt(out):''}${hasDebt?(d.debtShared===false?`<span class="debt-who"><span class="badge-net">100% negocio</span>${d.debtReason?' '+d.debtReason:''}</span>`:(d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:'')):''}${hasDebt?`<button type="button" class="mini-btn red" onclick="openCobro('${d.date}')">Cobrar deuda</button>`:''}</td>
+    <td class="num ${net(d)>=0?'pos':'neg'}">${fmt(net(d))}</td></tr>`;}).join('')
+    : `<tr><td colspan="11" class="empty">Aún no hay días registrados. Agrega tu primer cierre arriba para empezar.</td></tr>`;
+  const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
+        P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), BZ=days.reduce((a,d)=>a+biz(d),0),
+        EX=days.reduce((a,d)=>a+(d.expense||0),0), NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
+  document.getElementById('dayFoot').innerHTML = days.length?`<tr>
+    <td>TOTAL</td><td class="num">${fmt(C)}</td><td class="num">${fmt(V)}</td><td class="num park-col">${fmt(P)}</td><td class="num">${fmt(T)}</td>
+    <td class="num">${fmt(CM)}</td><td class="num">${fmt(BZ)}</td><td class="num">${fmt(EX)}</td><td></td>
+    <td class="num debt-col">${fmt(DBT)}</td>
+    <td class="num ${NT>=0?'pos':'neg'}">${fmt(NT)}</td></tr>`:'';
+}
+
+/* ---------- KPIs ---------- */
+function renderKpis(){
+  const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
+        P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), EX=days.reduce((a,d)=>a+(d.expense||0),0),
+        NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
+  // deudas cobradas, separadas por método (efectivo va a caja, tarjeta va a virtual). Cobros antiguos sin método -> efectivo.
+  const colCash=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
+  const colCard=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
+  const ND=collectedNonShared();  // deudas NO compartidas ya cobradas = ganancia neta 100% del negocio
+  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(C+colCash+DBT); kVirtual.textContent=fmt(V+colCard);
+  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT+ND);
+  kNoDebt.textContent=fmt(T+ND); kWithDebt.textContent=fmt(T+ND+DBT); kDebt.textContent=fmt(DBT);
+  const MK=days.reduce((a,d)=>a+mktVal(d),0); const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(MK);
+}
+
+/* ---------- lavadores: consolidado por lavador (pendiente + ya pagado) ----------
+   Recorre TODOS los días. Cada lavador que aparezca en algún día (o en la lista fija)
+   se muestra siempre, con su producción, su pendiente por pagar y lo ya pagado. */
+function aggWashers(){
+  const map={}; let uProdPend=0,uPayPend=0,uProdPaid=0,uPayPaid=0,paidTotal=0,paidMonth=0;
+  const cm=currentMonth();
+  const groups={};   // historial de pagos derivado de los días realmente pagados (clave = fecha de pago)
+  const bump=k=>{ if(!map[k]) map[k]={produced:0,payTotal:0,payPending:0,payPaid:0,valePending:0,valePaid:0}; return map[k]; };
+  days.forEach(d=>{
+    const pct=(num(d.commPct)||commPct)/100;
+    const paidDay=!!d.washPaid;
+    const inMonth=paidDay && (d.washPaidAt||'').slice(0,7)===cm;
+    let dayPay=0;
+    if(Array.isArray(d.washers) && d.washers.length){
+      d.washers.forEach(w=>{
+        const key=(w.name||'').trim()||'Sin nombre';
+        const amt=num(w.amount), pay=amt*pct; dayPay+=pay;
+        const m=bump(key); m.produced+=amt; m.payTotal+=pay;
+        if(paidDay) m.payPaid+=pay; else m.payPending+=pay;
+      });
+    } else if(wash(d)>0){
+      const pay=wash(d)*pct; dayPay+=pay;
+      if(paidDay){ uProdPaid+=wash(d); uPayPaid+=pay; } else { uProdPend+=wash(d); uPayPend+=pay; }
+    }
+    if(paidDay){
+      paidTotal+=dayPay; if(inMonth) paidMonth+=dayPay;
+      const gk=(d.washPaidAt||'anterior');
+      if(!groups[gk]) groups[gk]={paidAt:(d.washPaidAt||''),count:0,total:0};
+      groups[gk].count+=1; groups[gk].total+=dayPay;
+    }
+  });
+  roster.forEach(n=>{ const k=(n||'').trim(); if(k) bump(k); });   // que todos los lavadores fijos aparezcan siempre
+  // vales (adelantos): pendientes se restan de lo por pagar; ya descontados quedan como histórico
+  let valePendAll=0, valePaidAll=0;
+  vales.forEach(v=>{
+    const k=(v.washer||'').trim()||'Sin nombre';
+    const amt=num(v.amount);
+    const m=bump(k);
+    if(v.paid){ m.valePaid+=amt; valePaidAll+=amt; } else { m.valePending+=amt; valePendAll+=amt; }
+  });
+  const arr=Object.entries(map).map(([name,v])=>({name,...v})).sort((a,b)=>(b.payPending-b.valePending)-(a.payPending-a.valePending)||b.payTotal-a.payTotal);
+  const payHist=Object.values(groups).sort((a,b)=>(b.paidAt||'').localeCompare(a.paidAt||''));
+  return {map,arr,uProdPend,uPayPend,uProdPaid,uPayPaid,paidTotal,paidMonth,payHist,valePendAll,valePaidAll};
+}
+/* ---------- "Ya pagué a los lavadores": pone el pendiente en cero (sin tocar ganancias) y registra el pago ---------- */
+async function payWashers(){
+  const w=aggWashers();
+  const list=days.filter(d=>!d.washPaid && (Array.isArray(d.washers)&&d.washers.length ? d.washers.some(x=>num(x.amount)>0) : wash(d)>0));
+  const total=Math.round(w.arr.reduce((a,r)=>a+r.payPending,0)+w.uPayPend);
+  if(total<=0){ alert('No hay pagos pendientes.'); return; }
+  const detail=w.arr.filter(r=>r.payPending>0).map(r=>({name:r.name,amount:Math.round(r.payPending)}));
+  if(w.uPayPend>0) detail.push({name:'Sin asignar',amount:Math.round(w.uPayPend)});
+  if(!confirm('Vas a marcar como PAGADO '+fmt(total)+' a los lavadores.\n\nEsto pone el pendiente en cero (no cambia tus ganancias) y guarda el registro del pago. ¿Continuar?')) return;
+  const paidAt=new Date().toISOString().slice(0,10);
+  try{
+    for(const d of list){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:true,washPaidAt:paidAt,updatedAt:Date.now()},{merge:true}); }
+    for(const v of vales.filter(x=>!x.paid)){ await setDoc(doc(db,'vales',v.id),{paid:true,valePaidAt:paidAt},{merge:true}); }
+    await addDoc(collection(db,'pagos'),{paidAt,total,count:list.length,detail,createdAt:Date.now()});
+    alert('Pago registrado: '+fmt(total)+' a lavadores ('+list.length+' días). El pendiente vuelve a cero.');
+  }catch(err){ alert('No se pudo registrar el pago: '+err.message); }
+}
+window.payWashers=payWashers;
+/* ---------- Contraseña para acciones sensibles ---------- */
+function requirePass(){
+  const p = prompt('Esta acción está protegida.\n\nEscribe la contraseña para continuar:');
+  if(p===null) return false;               // canceló
+  if(p.trim()!=='SIMON123'){ alert('Contraseña incorrecta. Acción cancelada.'); return false; }
+  return true;
+}
+/* ---------- Deshacer último pago: devuelve los días del último pago a "por pagar" ---------- */
+async function undoPay(){
+  const paid=days.filter(d=>!!d.washPaid);
+  if(!paid.length){ alert('No hay pagos que deshacer.'); return; }
+  if(!requirePass()) return;
+  // agrupar por fecha de pago y tomar el más reciente
+  const groups={};
+  paid.forEach(d=>{ const k=d.washPaidAt||'anterior'; (groups[k]=groups[k]||[]).push(d); });
+  const lastKey=Object.keys(groups).sort((a,b)=>b.localeCompare(a))[0];
+  const list=groups[lastKey];
+  const pct=d=>(num(d.commPct)||commPct)/100;
+  const total=Math.round(list.reduce((a,d)=>{
+    const p= (Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
+    return a+p*pct(d);
+  },0));
+  const label=lastKey==='anterior'?'(pago anterior sin fecha)':lastKey;
+  if(!confirm('Vas a DESHACER el pago del '+label+'.\n\nSe devolverán '+fmt(total)+' de '+list.length+' día(s) a "Por pagar". Tus ganancias no cambian. ¿Continuar?')) return;
+  try{
+    for(const d of list){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:false,washPaidAt:'',updatedAt:Date.now()},{merge:true}); }
+    for(const v of vales.filter(x=>x.paid && (x.valePaidAt||'anterior')===lastKey)){ await setDoc(doc(db,'vales',v.id),{paid:false,valePaidAt:''},{merge:true}); }
+    alert('Pago deshecho: '+fmt(total)+' vuelve a "Por pagar".');
+  }catch(err){ alert('No se pudo deshacer el pago: '+err.message); }
+}
+window.undoPay=undoPay;
+/* ---------- Resetear pagos: devuelve TODO lo ya pagado a "por pagar" y vacía el historial ---------- */
+async function resetPay(){
+  const paid=days.filter(d=>!!d.washPaid);
+  if(!paid.length){ alert('No hay pagos registrados para resetear.'); return; }
+  if(!requirePass()) return;
+  const pct=d=>(num(d.commPct)||commPct)/100;
+  const total=Math.round(paid.reduce((a,d)=>{
+    const p=(Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
+    return a+p*pct(d);
+  },0));
+  if(!confirm('RESETEAR TODOS LOS PAGOS\n\nSe devolverán '+fmt(total)+' de '+paid.length+' día(s) desde "Ya pagado" a "Por pagar", y el historial de pagos quedará vacío.\n\nTus ganancias NO cambian. ¿Continuar?')) return;
+  try{
+    for(const d of paid){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:false,washPaidAt:'',updatedAt:Date.now()},{merge:true}); }
+    for(const v of vales.filter(x=>x.paid)){ await setDoc(doc(db,'vales',v.id),{paid:false,valePaidAt:''},{merge:true}); }
+    alert('Pagos reseteados: '+fmt(total)+' vuelve a "Por pagar". El historial quedó vacío.');
+  }catch(err){ alert('No se pudo resetear: '+err.message); }
+}
+window.resetPay=resetPay;
+function renderWashersDash(){
+  const w=aggWashers();
+  const rows=w.arr.map(r=>({name:r.name,produced:r.produced,gross:r.payPending,vale:r.valePending,paid:r.payPaid,pct:r.produced>0?Math.round(r.payTotal/r.produced*100):commPct}));
+  if(w.uPayPend>0||w.uPayPaid>0) rows.push({name:'Sin asignar (días viejos)',produced:w.uProdPend+w.uProdPaid,gross:w.uPayPend,vale:0,paid:w.uPayPaid,pct:commPct});
+  const totProd=rows.reduce((a,r)=>a+r.produced,0), totGross=rows.reduce((a,r)=>a+r.gross,0),
+        totVale=rows.reduce((a,r)=>a+r.vale,0), totNeto=rows.reduce((a,r)=>a+(r.gross-r.vale),0), totPaid=rows.reduce((a,r)=>a+r.paid,0);
+  document.getElementById('washBody').innerHTML = rows.length? rows.map(r=>{const neto=r.gross-r.vale;return `<tr>
+    <td>${r.name}</td>
+    <td class="num">${fmt(r.produced)}</td>
+    <td class="num">${r.pct}%</td>
+    <td class="num">${fmt(r.gross)}</td>
+    <td class="num ${r.vale>0?'neg':''}">${r.vale>0?'−'+fmt(r.vale):fmt(0)}</td>
+    <td class="num ${neto>=0?'pos':'neg'}">${fmt(neto)}</td>
+    <td class="num">${fmt(r.paid)}</td></tr>`;}).join('')
+    : `<tr><td colspan="7" class="empty">Aún no hay lavadores por pagar. Asígnalos al cerrar un día.</td></tr>`;
+  document.getElementById('washFoot').innerHTML = rows.length?`<tr>
+    <td>TOTAL</td><td class="num">${fmt(totProd)}</td><td></td><td class="num">${fmt(totGross)}</td><td class="num ${totVale>0?'neg':''}">${totVale>0?'−'+fmt(totVale):fmt(0)}</td><td class="num">${fmt(totNeto)}</td><td class="num">${fmt(totPaid)}</td></tr>`:'';
+  document.getElementById('wPay').textContent=fmt(totNeto);
+  document.getElementById('wPaidTot').textContent=fmt(w.paidTotal);
+  document.getElementById('wPaidMonth').textContent=fmt(w.paidMonth);
+  const wv=document.getElementById('wVale'); if(wv) wv.textContent=fmt(w.valePendAll);
+  const pg=w.payHist||[];
+  const histRows=[];
+  pg.forEach(p=>histRows.push({date:p.paidAt||'',label:(p.paidAt?'Pago a lavadores':'Pago anterior')+(p.count?' ('+p.count+' día'+(p.count>1?'s':'')+')':''),total:p.total}));
+  vales.forEach(v=>histRows.push({date:v.valeAt||'',label:'Vale — '+(v.washer||'lavador'),total:num(v.amount),vale:true}));
+  histRows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('pagosBody').innerHTML = histRows.length? histRows.map(h=>`<tr><td>${h.date||'—'}</td><td>${h.label}</td><td class="num ${h.vale?'':'pos'}">${fmt(h.total)}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="empty">Aún no has registrado pagos.</td></tr>`;
+  const vs=[...vales].sort((a,b)=>(b.valeAt||'').localeCompare(a.valeAt||''));
+  const vb=document.getElementById('valesBody');
+  if(vb) vb.innerHTML = vs.length? vs.map(v=>`<tr>
+    <td>${v.valeAt||''}</td><td>${v.washer||''}</td>
+    <td class="num neg">${fmt(num(v.amount))}</td>
+    <td>${v.note||''}</td>
+    <td>${v.paid?'<span class="badge-lock">descontado</span>':'<span class="badge-val">pendiente</span>'}</td></tr>`).join('')
+    : `<tr><td colspan="5" class="empty">Aún no has dado vales (adelantos).</td></tr>`;
+}
+
+/* ---------- charts ---------- */
+function themeAxis(){return document.documentElement.getAttribute('data-theme')==='dark'?'#98a2b3':'#5b6472';}
+function mk(id){ if(charts[id])return charts[id]; charts[id]=echarts.init(document.getElementById(id),null,{renderer:'svg'}); return charts[id]; }
+function renderCharts(){
+  const axis=themeAxis();
+  const sorted=[...days].sort((a,b)=>a.date.localeCompare(b.date));
+  const labels=sorted.map(d=>d.date);
+  mk('chartDay').setOption({tooltip:{trigger:'axis',valueFormatter:v=>fmt(v)},legend:{data:['Lavados','Parqueadero','Utilidad negocio'],textStyle:{color:axis}},
+    grid:{left:64,right:16,top:36,bottom:40},xAxis:{type:'category',data:labels,axisLabel:{color:axis,rotate:labels.length>8?45:0}},
+    yAxis:{type:'value',axisLabel:{color:axis,formatter:v=>v>=1e6?(v/1e6)+'M':v/1e3+'k'}},
+    series:[{name:'Lavados',type:'bar',stack:'ing',data:sorted.map(wash),itemStyle:{color:'#2f6bff'}},
+            {name:'Parqueadero',type:'bar',stack:'ing',data:sorted.map(park),itemStyle:{color:'#0d9488'}},
+            {name:'Utilidad negocio',type:'bar',data:sorted.map(net),itemStyle:{color:'#17915b'}}]});
+  const CM=days.reduce((a,d)=>a+comm(d),0), EX=days.reduce((a,d)=>a+(d.expense||0),0), NT=days.reduce((a,d)=>a+net(d),0);
+  mk('chartSplit').setOption({tooltip:{trigger:'item',valueFormatter:v=>fmt(v)},legend:{bottom:0,textStyle:{color:axis}},
+    series:[{type:'pie',radius:['45%','70%'],center:['50%','44%'],label:{color:axis},data:[
+      {name:'Lavadores',value:CM,itemStyle:{color:'#b8860b'}},
+      {name:'Gastos',value:EX,itemStyle:{color:'#d1435b'}},
+      {name:'Utilidad negocio',value:Math.max(0,NT),itemStyle:{color:'#17915b'}}]}]});
+  let acc=0;const pts=sorted.map(d=>{acc+=net(d);return [d.date,acc];});
+  mk('chartNet').setOption({tooltip:{trigger:'axis',valueFormatter:v=>fmt(v)},grid:{left:64,right:16,top:20,bottom:40},
+    xAxis:{type:'category',data:pts.map(p=>p[0]),axisLabel:{color:axis,rotate:pts.length>8?45:0}},
+    yAxis:{type:'value',axisLabel:{color:axis,formatter:v=>v>=1e6?(v/1e6)+'M':v/1e3+'k'}},
+    series:[{type:'line',smooth:true,data:pts.map(p=>p[1]),areaStyle:{color:'rgba(23,145,91,.14)'},itemStyle:{color:'#17915b'}}]});
+}
+function renderWashChart(){
+  const axis=themeAxis();
+  const arr=aggWashers().arr.filter(a=>a.payPending>0);
+  mk('chartWash').setOption({tooltip:{trigger:'axis',valueFormatter:v=>fmt(v)},grid:{left:80,right:16,top:20,bottom:50},
+    xAxis:{type:'category',data:arr.map(a=>a.name),axisLabel:{color:axis,rotate:arr.length>4?30:0}},
+    yAxis:{type:'value',axisLabel:{color:axis,formatter:v=>v>=1e6?(v/1e6)+'M':v/1e3+'k'}},
+    series:[{type:'bar',data:arr.map(a=>Math.round(a.payPending)),itemStyle:{color:'#b8860b'},barMaxWidth:60,
+      label:{show:true,position:'top',color:axis,formatter:p=>fmt(p.value)}}]});
+}
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c.resize()));
+
+function renderAll(){
+  refreshPctLabels(); renderKpis(); renderDays(); renderWashersDash();
+  if(document.getElementById('resumen').classList.contains('active')) renderCharts();
+  if(document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+}
+
+/* ---------- Excel ---------- */
+function washersToStr(list){ return (list||[]).map(w=>`${w.name||''}:${w.amount||0}`).join(' | '); }
+function parseWashers(s){ if(!s)return []; return (''+s).split('|').map(p=>{const i=p.lastIndexOf(':');const n=i>=0?p.slice(0,i):p;const a=i>=0?p.slice(i+1):'';return {name:(n||'').trim(),amount:digits(a)};}).filter(w=>w.name||w.amount); }
+document.getElementById('importFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=async ev=>{
+    const wb=XLSX.read(ev.target.result,{type:'array'});
+    const sh = wb.SheetNames.includes('CierreDiario')?'CierreDiario':wb.SheetNames[0];
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sh]);
+    const recs=rows.map(x=>({date:normDate(x.Fecha),cash:+x.Efectivo||0,virtual:+x.Cuenta||+x.Virtual||0,
+      park:+x.Parqueadero||0, parkPct:x['% Parq.']!=null?+x['% Parq.']:0,
+      expense:+x.Gastos||0,note:x.Detalle||x.Nota||'',
+      debt:+x.Debe||+x['Debe (original)']||0, debtPaid:+x.Cobrado||0, debtWho:x['Quién debe']||x.Quien||'', debtShared:(String(x['Tipo deuda']||'').toLowerCase().indexOf('neto')>=0||String(x['Tipo deuda']||'').toLowerCase().indexOf('negocio')>=0)?false:true, debtReason:x['Motivo deuda']||'',
+      washers:parseWashers(x['Lavadores (detalle)']),
+      commPct:x['% Lavadores']!=null?+x['% Lavadores']:commPct,closed:true}))
+      .filter(x=>x.date);
+    try{
+      setStatus("wait","Subiendo "+recs.length+"...");
+      for(const rec of recs){ await setDoc(doc(db,COL_DAYS,rec.date), {...rec, updatedAt:Date.now()}, {merge:true}); }
+      alert('Excel importado a la nube: '+recs.length+' días.');
+    }catch(err){ alert('Error subiendo el Excel: '+err.message); }
+  };
+  r.readAsArrayBuffer(f);e.target.value='';
+};
+function normDate(v){
+  if(!v)return '';
+  if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);if(d)return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}
+  return (''+v).slice(0,10);
+}
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  const rows=[...days].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
+    Fecha:d.date,Efectivo:d.cash||0,Cuenta:d.virtual||0,Parqueadero:park(d),'Total del día':total(d),
+    ['% Lavadores']:d.commPct??commPct,['% Parq.']:d.parkPct||0,'Lavadores':comm(d),'Negocio':biz(d),
+    Gastos:d.expense||0,Detalle:d.note||'','Debe (original)':d.debt||0,'Cobrado':d.debtPaid||0,'Deuda pendiente':debtOut(d),'Quién debe':d.debtWho||'','Tipo deuda':(d.debtShared===false?'Neto (100% negocio)':'Compartida'),'Motivo deuda':d.debtReason||'','Marketing':mktVal(d),
+    'Lavadores (detalle)':washersToStr(d.washers),'Utilidad neta':net(d)}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'',Detalle:'','Debe (original)':'','Cobrado':'','Deuda pendiente':'','Quién debe':'','Tipo deuda':'','Motivo deuda':'','Marketing':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
+  const T=days.reduce((a,d)=>a+total(d),0),C=days.reduce((a,d)=>a+(d.cash||0),0),V=days.reduce((a,d)=>a+(d.virtual||0),0),
+        P=days.reduce((a,d)=>a+park(d),0),CM=days.reduce((a,d)=>a+comm(d),0),EX=days.reduce((a,d)=>a+(d.expense||0),0),
+        NT=days.reduce((a,d)=>a+net(d),0),DBT=days.reduce((a,d)=>a+debt(d),0);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([
+    {Concepto:'Total generado',Valor:T},{Concepto:'En efectivo',Valor:C},{Concepto:'En cuenta',Valor:V},
+    {Concepto:'Parqueadero',Valor:P},{Concepto:'Lavadores',Valor:CM},{Concepto:'Gastos',Valor:EX},{Concepto:'Utilidad negocio neta',Valor:NT},
+    {Concepto:'Total sin deuda (hoy)',Valor:T},{Concepto:'Total con deuda (si pagan)',Valor:T+DBT},{Concepto:'Nos falta por cobrar (deuda)',Valor:DBT},{Concepto:'Ingresos por marketing',Valor:days.reduce((a,d)=>a+mktVal(d),0)}]),'Resumen');
+  const wagg=aggWashers();
+  const wrows=wagg.arr.map(r=>({Lavador:r.name,'Produjo':Math.round(r.produced),'Comisión':Math.round(r.payPending),'Vales pendientes':Math.round(r.valePending||0),'Por pagar (neto)':Math.round((r.payPending||0)-(r.valePending||0)),'Ya pagado':Math.round(r.payPaid)}));
+  if(wagg.uPayPend>0||wagg.uPayPaid>0) wrows.push({Lavador:'Sin asignar (días viejos)','Produjo':Math.round(wagg.uProdPend+wagg.uProdPaid),'Comisión':Math.round(wagg.uPayPend),'Vales pendientes':0,'Por pagar (neto)':Math.round(wagg.uPayPend),'Ya pagado':Math.round(wagg.uPayPaid)});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wrows.length?wrows:[{Lavador:'','Produjo':'','Comisión':'','Vales pendientes':'','Por pagar (neto)':'','Ya pagado':''}]),'Lavadores');
+  const prows=[...pagos].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(p=>({['Fecha de pago']:p.paidAt||'','Días':p.count||0,'Total pagado':p.total||0,'Detalle':(p.detail||[]).map(w=>`${w.name}:${w.amount}`).join(' | ')}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(prows.length?prows:[{['Fecha de pago']:'','Días':'','Total pagado':'','Detalle':''}]),'Pagos');
+  const crows=[...cobros].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(c=>({['Día de la deuda']:c.dayDate||'','Fecha de cobro':c.paidAt||'','Valor cobrado':c.amount||0,'Quién pagó':c.who||'','Cómo pagó':(c.method==='tarjeta')?'Tarjeta/cuenta':'Efectivo'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crows.length?crows:[{['Día de la deuda']:'','Fecha de cobro':'','Valor cobrado':'','Quién pagó':'','Cómo pagó':''}]),'Cobros');
+  const vrows=[...vales].sort((a,b)=>(a.valeAt||'').localeCompare(b.valeAt||'')).map(v=>({Fecha:v.valeAt||'',Lavador:v.washer||'',Valor:num(v.amount),Nota:v.note||'',Estado:v.paid?'descontado':'pendiente'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(vrows.length?vrows:[{Fecha:'',Lavador:'',Valor:'',Nota:'',Estado:''}]),'Vales');
+  const nrows=[...notas].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(n=>({Fecha:n.at||'',Autor:n.autor||'',Nota:n.text||'',Estado:n.seen?'vista':'nueva'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(nrows.length?nrows:[{Fecha:'',Autor:'',Nota:'',Estado:''}]),'Notas');
+  XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function downloadTemplate(){
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+    ['Fecha','Efectivo','Cuenta','Parqueadero','Gastos','Detalle','Debe','Quién debe','Lavadores (detalle)','% Lavadores','% Parq.']
+  ]),'CierreDiario');
+  XLSX.writeFile(wb,'plantilla_lavado_vip.xlsx');
+}
+window.exportExcel=exportExcel;
+window.downloadTemplate=downloadTemplate;
+window.openPark=openPark;
+window.closePark=closePark;
+
+/* ---------- PDF ---------- */
+window.GleanBridge && window.GleanBridge.postMessage({actionId:'export-pdf',type:'glean-add-menu',metadata:{label:'Export as PDF',icon:'export'}});
+window.GleanBridge && window.GleanBridge.onMessage('action',d=>{if(d.actionId==='export-pdf')window.print();});
+function prepareChartsForPrint(){document.querySelectorAll('[_echarts_instance_]').forEach(el=>{const c=echarts.getInstanceByDom(el);if(!c)return;const img=new Image();img.src=c.getDataURL({type:'png',pixelRatio:2});img.className='print-chart-img';img.style.cssText='width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;z-index:10;';el.dataset.pp=el.style.position;el.style.position='relative';el.appendChild(img);});}
+function cleanUpAfterPrint(){document.querySelectorAll('[_echarts_instance_]').forEach(el=>{const img=el.querySelector('.print-chart-img');if(!img)return;img.remove();el.style.position=el.dataset.pp||'';});}
+window.addEventListener('beforeprint',()=>{document.querySelectorAll('.view').forEach(v=>v.style.display='block');prepareChartsForPrint();});
+window.addEventListener('afterprint',()=>{document.querySelectorAll('.view').forEach(v=>{v.style.display=v.classList.contains('active')?'block':'';});cleanUpAfterPrint();});
+
+/* ---------- init ---------- */
+initWashers();
+refreshPctLabels(); renderAll(); renderNotasBadge(); setTimeout(renderCharts,100);
+</script>
+</body>
+</html>
