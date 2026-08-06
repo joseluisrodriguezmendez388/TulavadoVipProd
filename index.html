@@ -302,7 +302,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <div class="card"><h3>Historial de pagos</h3>
         <div class="table-wrap" style="max-height:340px">
           <table>
-            <thead><tr><th>Fecha de pago</th><th class="num">Días</th><th class="num">Total pagado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Total</th></tr></thead>
             <tbody id="pagosBody"></tbody>
           </table>
         </div>
@@ -942,7 +942,11 @@ function renderWashersDash(){
   document.getElementById('wPaidMonth').textContent=fmt(w.paidMonth);
   const wv=document.getElementById('wVale'); if(wv) wv.textContent=fmt(w.valePendAll);
   const pg=w.payHist||[];
-  document.getElementById('pagosBody').innerHTML = pg.length? pg.map(p=>`<tr><td>${p.paidAt||'Pago anterior'}</td><td class="num">${p.count||''}</td><td class="num pos">${fmt(p.total)}</td></tr>`).join('')
+  const histRows=[];
+  pg.forEach(p=>histRows.push({date:p.paidAt||'',label:(p.paidAt?'Pago a lavadores':'Pago anterior')+(p.count?' ('+p.count+' día'+(p.count>1?'s':'')+')':''),total:p.total}));
+  vales.forEach(v=>histRows.push({date:v.valeAt||'',label:'Vale — '+(v.washer||'lavador'),total:num(v.amount),vale:true}));
+  histRows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('pagosBody').innerHTML = histRows.length? histRows.map(h=>`<tr><td>${h.date||'—'}</td><td>${h.label}</td><td class="num ${h.vale?'':'pos'}">${fmt(h.total)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="empty">Aún no has registrado pagos.</td></tr>`;
   const vs=[...vales].sort((a,b)=>(b.valeAt||'').localeCompare(a.valeAt||''));
   const vb=document.getElementById('valesBody');
