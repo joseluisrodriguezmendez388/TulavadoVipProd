@@ -795,10 +795,18 @@ async function payWashers(){
   }catch(err){ alert('No se pudo registrar el pago: '+err.message); }
 }
 window.payWashers=payWashers;
+/* ---------- Contraseña para acciones sensibles ---------- */
+function requirePass(){
+  const p = prompt('Esta acción está protegida.\n\nEscribe la contraseña para continuar:');
+  if(p===null) return false;               // canceló
+  if(p.trim()!=='SIMON123'){ alert('Contraseña incorrecta. Acción cancelada.'); return false; }
+  return true;
+}
 /* ---------- Deshacer último pago: devuelve los días del último pago a "por pagar" ---------- */
 async function undoPay(){
   const paid=days.filter(d=>!!d.washPaid);
   if(!paid.length){ alert('No hay pagos que deshacer.'); return; }
+  if(!requirePass()) return;
   // agrupar por fecha de pago y tomar el más reciente
   const groups={};
   paid.forEach(d=>{ const k=d.washPaidAt||'anterior'; (groups[k]=groups[k]||[]).push(d); });
@@ -821,6 +829,7 @@ window.undoPay=undoPay;
 async function resetPay(){
   const paid=days.filter(d=>!!d.washPaid);
   if(!paid.length){ alert('No hay pagos registrados para resetear.'); return; }
+  if(!requirePass()) return;
   const pct=d=>(num(d.commPct)||commPct)/100;
   const total=Math.round(paid.reduce((a,d)=>{
     const p=(Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
