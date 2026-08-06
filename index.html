@@ -250,8 +250,8 @@ tr.has-debt{background:var(--artifact-red-soft)}
   <section class="view" id="resumen">
     <div class="kpis">
       <div class="kpi accent"><div class="lbl">Total generado</div><div class="val" id="kTotal">$0</div><div class="sub">lavados + parqueadero</div></div>
-      <div class="kpi green"><div class="lbl">En efectivo</div><div class="val" id="kCash">$0</div><div class="sub">caja</div></div>
-      <div class="kpi teal"><div class="lbl">En cuenta</div><div class="val" id="kVirtual">$0</div><div class="sub">virtual</div></div>
+      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pendientes + cobradas en efectivo</div></div>
+      <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">virtual + deudas cobradas en tarjeta</div></div>
       <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
       <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
       <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
@@ -366,6 +366,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <p class="sub" id="cInfo" style="margin:-4px 0 0"></p>
       <label class="field">Valor cobrado<input type="text" inputmode="numeric" id="cValue" placeholder="0" required autocomplete="off"></label>
       <label class="field">¿Quién pagó?<input id="cWho" placeholder="Juan..." autocomplete="off"></label>
+      <label class="field">¿Cómo pagó?<select id="cMethod"><option value="efectivo">Efectivo (caja)</option><option value="tarjeta">Tarjeta / cuenta (virtual)</option></select></label>
       <div class="row">
         <button type="button" class="btn ghost" onclick="closeCobro()">Cancelar</button>
         <button type="submit" class="btn primary">Registrar cobro</button>
@@ -510,7 +511,7 @@ onSnapshot(collection(db, "pagos"),
 );
 /* registros de cobro de deudas */
 onSnapshot(collection(db, "cobros"),
-  snap => { cobros = snap.docs.map(x => ({ id:x.id, ...x.data() })); },
+  snap => { cobros = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderAll(); },
   () => {}
 );
 /* registros de vales (adelantos a lavadores) */
@@ -730,8 +731,9 @@ document.getElementById('cobroForm').onsubmit=async e=>{
   if(val<=0){ alert('Ingresa el valor cobrado.'); return; }
   if(val>out){ alert('No puedes cobrar más de lo que deben.\n\nDeuda pendiente de ese día: '+fmt(out)+'.'); return; }
   try{
+    const method=(document.getElementById('cMethod').value==='tarjeta')?'tarjeta':'efectivo';
     await setDoc(doc(db,COL_DAYS,d.date),{debtPaid:(d.debtPaid||0)+val,updatedAt:Date.now()},{merge:true});
-    await addDoc(collection(db,'cobros'),{dayDate:d.date,amount:val,who:cWho.value.trim(),paidAt:new Date().toISOString().slice(0,10),createdAt:Date.now()});
+    await addDoc(collection(db,'cobros'),{dayDate:d.date,amount:val,who:cWho.value.trim(),method:method,paidAt:new Date().toISOString().slice(0,10),createdAt:Date.now()});
     closeCobro();
   }catch(err){ alert('No se pudo registrar el cobro: '+err.message); }
 };
@@ -804,7 +806,10 @@ function renderKpis(){
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), EX=days.reduce((a,d)=>a+(d.expense||0),0),
         NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
-  kTotal.textContent=fmt(T); kCash.textContent=fmt(C); kVirtual.textContent=fmt(V);
+  // deudas cobradas, separadas por método (efectivo va a caja, tarjeta va a virtual). Cobros antiguos sin método -> efectivo.
+  const colCash=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
+  const colCard=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
+  kTotal.textContent=fmt(T); kCash.textContent=fmt(C+colCash+DBT); kVirtual.textContent=fmt(V+colCard);
   kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT);
   kNoDebt.textContent=fmt(T); kWithDebt.textContent=fmt(T+DBT); kDebt.textContent=fmt(DBT);
 }
@@ -1050,8 +1055,8 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wrows.length?wrows:[{Lavador:'','Produjo':'','Comisión':'','Vales pendientes':'','Por pagar (neto)':'','Ya pagado':''}]),'Lavadores');
   const prows=[...pagos].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(p=>({['Fecha de pago']:p.paidAt||'','Días':p.count||0,'Total pagado':p.total||0,'Detalle':(p.detail||[]).map(w=>`${w.name}:${w.amount}`).join(' | ')}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(prows.length?prows:[{['Fecha de pago']:'','Días':'','Total pagado':'','Detalle':''}]),'Pagos');
-  const crows=[...cobros].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(c=>({['Día de la deuda']:c.dayDate||'','Fecha de cobro':c.paidAt||'','Valor cobrado':c.amount||0,'Quién pagó':c.who||''}));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crows.length?crows:[{['Día de la deuda']:'','Fecha de cobro':'','Valor cobrado':'','Quién pagó':''}]),'Cobros');
+  const crows=[...cobros].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(c=>({['Día de la deuda']:c.dayDate||'','Fecha de cobro':c.paidAt||'','Valor cobrado':c.amount||0,'Quién pagó':c.who||'','Cómo pagó':(c.method==='tarjeta')?'Tarjeta/cuenta':'Efectivo'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crows.length?crows:[{['Día de la deuda']:'','Fecha de cobro':'','Valor cobrado':'','Quién pagó':'','Cómo pagó':''}]),'Cobros');
   const vrows=[...vales].sort((a,b)=>(a.valeAt||'').localeCompare(b.valeAt||'')).map(v=>({Fecha:v.valeAt||'',Lavador:v.washer||'',Valor:num(v.amount),Nota:v.note||'',Estado:v.paid?'descontado':'pendiente'}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(vrows.length?vrows:[{Fecha:'',Lavador:'',Valor:'',Nota:'',Estado:''}]),'Vales');
   XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
