@@ -98,6 +98,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--artifact-border)}
 .empty{text-align:center;color:var(--artifact-text-soft);padding:40px;font-size:.9rem}
 .badge-lock{font-size:.68rem;color:var(--artifact-text-soft);background:var(--artifact-surface-2);border:1px solid var(--artifact-border);padding:2px 7px;border-radius:999px;margin-left:6px}
 .badge-val{font-size:.68rem;color:var(--artifact-red);background:var(--artifact-red-soft);border:1px solid var(--artifact-red);padding:2px 7px;border-radius:999px;margin-left:6px;font-weight:700}
+.badge-net{font-size:.66rem;color:var(--artifact-green);background:var(--artifact-green-soft);border:1px solid var(--artifact-green);padding:1px 6px;border-radius:999px;font-weight:700;margin-right:4px}
 .badge-assign{font-size:.68rem;color:var(--artifact-amber);background:rgba(184,134,11,.12);border:1px solid var(--artifact-amber);padding:2px 7px;border-radius:999px;margin-left:6px;font-weight:700}
 .mini-btn{font:inherit;font-size:.7rem;font-weight:700;border:1px solid var(--artifact-amber);color:var(--artifact-amber);background:rgba(184,134,11,.12);padding:3px 9px;border-radius:999px;cursor:pointer;margin-left:6px;white-space:nowrap}
 .mini-btn:hover{background:var(--artifact-amber);color:#fff}
@@ -226,6 +227,8 @@ tr.has-debt{background:var(--artifact-red-soft)}
           <label class="field">¿A qué se pagó?<input id="fNote" placeholder="Insumos, servicios..."></label>
           <label class="field debt">Se quedó debiendo<input type="text" inputmode="numeric" id="fDebt" placeholder="0" autocomplete="off"></label>
           <label class="field debt">¿Quién quedó debiendo?<input id="fDebtWho" placeholder="Juan, Andrés..." autocomplete="off"></label>
+          <label class="field" style="flex-direction:row;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="fDebtNotShared" style="width:auto;flex:none"> Esta deuda NO es compartida con los lavadores (100% del negocio)</label>
+          <label class="field debt" id="fDebtReasonWrap" style="display:none">¿A qué se debe la deuda?<input id="fDebtReason" placeholder="Parqueadero, venta, etc." autocomplete="off"></label>
           <label class="field"><span class="chk-row"><input type="checkbox" id="fMkt"> ¿Cliente agendado por marketing?</span></label>
           <label class="field mkt-wrap" id="fMktWrap">Valor por marketing<input type="text" inputmode="numeric" id="fMktValue" placeholder="0" autocomplete="off"></label>
         </div>
@@ -487,6 +490,11 @@ const net   = d => biz(d)-num(d.expense);                                       
 const debt  = d => num(d.debt);                                                    // deuda original registrada
 const mktVal = d => d.mkt ? num(d.mktValue) : 0;                                    // ingreso atribuido a marketing ese día
 const debtOut = d => Math.max(0,num(d.debt)-num(d.debtPaid));                       // deuda pendiente por cobrar
+const isSharedDebt = d => d.debtShared!==false;                                    // por defecto la deuda es compartida con lavadores
+/* suma de cobros de deudas NO compartidas (100% negocio): son ganancia neta al cobrarse */
+function collectedNonShared(){
+  return cobros.reduce((a,c)=>{ const d=days.find(x=>x.date===c.dayDate); return a + ((d && d.debtShared===false)? num(c.amount):0); },0);
+}
 const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
 const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
 
@@ -495,6 +503,7 @@ async function closeDay(d){
   await setDoc(doc(db, COL_DAYS, d.date), {
     date:d.date, cash:d.cash, virtual:d.virtual, expense:d.expense,
     note:d.note, debt:d.debt||0, debtWho:d.debtWho||'',
+    debtShared:(d.debtShared!==false), debtReason:d.debtReason||'',
     mkt:!!d.mkt, mktValue:d.mktValue||0,
     washers:d.washers||[],
     commPct:d.commPct, closed:true, updatedAt:Date.now()
@@ -647,6 +656,9 @@ document.getElementById('addWasher').onclick=()=>{ addWasherRow(); syncRosterFro
 /* ---------- marketing: mostrar/ocultar el valor según el checkbox ---------- */
 function toggleMkt(){ document.getElementById('fMktWrap').classList.toggle('show', document.getElementById('fMkt').checked); }
 document.getElementById('fMkt').addEventListener('change',toggleMkt);
+/* ---------- deuda: mostrar campo "a qué se debe" cuando NO es compartida ---------- */
+function toggleDebtShared(){ document.getElementById('fDebtReasonWrap').style.display = document.getElementById('fDebtNotShared').checked ? 'flex' : 'none'; }
+document.getElementById('fDebtNotShared').addEventListener('change',toggleDebtShared);
 
 /* ---------- form cierre ---------- */
 document.getElementById('fDate').valueAsDate=new Date();
@@ -654,10 +666,11 @@ document.getElementById('fDate').valueAsDate=new Date();
 document.getElementById('fDate').addEventListener('change',()=>{
   const ex=days.find(d=>d.date===fDate.value);
   if(ex && !isLocked(ex)){
-    // Día ya registrado y todavía editable (con deuda o sin lavadoresasignados): precargamos todo para completarlo.
+    // Día ya registrado y todavía editable (con deuda o sin lavadores asignados): precargamos todo para completarlo.
     fCash.value=sep(ex.cash||0); fVirtual.value=sep(ex.virtual||0);
     fExpense.value=sep(ex.expense||0); fNote.value=ex.note||'';
     fDebt.value=sep(ex.debt||0); fDebtWho.value=ex.debtWho||'';
+    document.getElementById('fDebtNotShared').checked=(ex.debtShared===false); fDebtReason.value=ex.debtReason||''; toggleDebtShared();
     document.getElementById('fMkt').checked=!!ex.mkt; fMktValue.value=ex.mktValue?sep(ex.mktValue):''; toggleMkt();
     initWashers(ex.washers);
     updateWashCheck();
@@ -683,12 +696,14 @@ document.getElementById('entryForm').onsubmit=async e=>{
   const rec={date:fDate.value,cash:numVal(fCash),virtual:numVal(fVirtual),
     expense:numVal(fExpense),note:fNote.value.trim(),
     debt:numVal(fDebt),debtWho:fDebtWho.value.trim(),
+    debtShared:!document.getElementById('fDebtNotShared').checked, debtReason:fDebtReason.value.trim(),
     mkt:mktOn, mktValue:mktOn?numVal(fMktValue):0,
     washers, commPct:commPct};
   try{
     await closeDay(rec);
     syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
     fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
+    document.getElementById('fDebtNotShared').checked=false; fDebtReason.value=''; toggleDebtShared();
     document.getElementById('fMkt').checked=false; fMktValue.value=''; toggleMkt();
     initWashers();
   }catch(err){ alert('No se pudo guardar en la nube: '+err.message); }
@@ -767,7 +782,7 @@ function openCobro(preDate){
   const list=days.filter(d=>debtOut(d)>0).sort((a,b)=>a.date.localeCompare(b.date));
   if(!list.length){ alert('No hay deudas pendientes por cobrar. Todos los días están consolidados.'); return; }
   const sel=document.getElementById('cDay');
-  sel.innerHTML=list.map(d=>`<option value="${d.date}">${d.date} — debe ${fmt(debtOut(d))}</option>`).join('');
+  sel.innerHTML=list.map(d=>`<option value="${d.date}">${d.date} — debe ${fmt(debtOut(d))}${d.debtShared===false?' (100% negocio)':''}</option>`).join('');
   if(preDate && list.some(d=>d.date===preDate)) sel.value=preDate;
   cValue.value=''; cWho.value='';
   updateCobroInfo();
@@ -775,7 +790,7 @@ function openCobro(preDate){
 }
 function updateCobroInfo(){
   const d=days.find(x=>x.date===cDay.value);
-  document.getElementById('cInfo').textContent = d ? ('Deuda pendiente de ese día: '+fmt(debtOut(d))+(d.debtWho?' · quedó debiendo: '+d.debtWho:'')) : '';
+  document.getElementById('cInfo').textContent = d ? ('Deuda pendiente de ese día: '+fmt(debtOut(d))+(d.debtShared===false?' · 100% del negocio (sin comisión)'+(d.debtReason?' — '+d.debtReason:''):(d.debtWho?' · quedó debiendo: '+d.debtWho:''))) : '';
 }
 function closeCobro(){ document.getElementById('cobroModal').classList.remove('open'); }
 document.getElementById('cDay').addEventListener('change',updateCobroInfo);
@@ -883,7 +898,7 @@ function renderDays(){
     <td class="num">${fmt(biz(d))}</td>
     <td class="num">${fmt(d.expense)}</td>
     <td>${d.note||''}</td>
-    <td class="num debt-col">${hasDebt?fmt(out):''}${hasDebt&&d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:''}${hasDebt?`<button type="button" class="mini-btn red" onclick="openCobro('${d.date}')">Cobrar deuda</button>`:''}</td>
+    <td class="num debt-col">${hasDebt?fmt(out):''}${hasDebt?(d.debtShared===false?`<span class="debt-who"><span class="badge-net">100% negocio</span>${d.debtReason?' '+d.debtReason:''}</span>`:(d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:'')):''}${hasDebt?`<button type="button" class="mini-btn red" onclick="openCobro('${d.date}')">Cobrar deuda</button>`:''}</td>
     <td class="num ${net(d)>=0?'pos':'neg'}">${fmt(net(d))}</td></tr>`;}).join('')
     : `<tr><td colspan="11" class="empty">Aún no hay días registrados. Agrega tu primer cierre arriba para empezar.</td></tr>`;
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
@@ -904,9 +919,10 @@ function renderKpis(){
   // deudas cobradas, separadas por método (efectivo va a caja, tarjeta va a virtual). Cobros antiguos sin método -> efectivo.
   const colCash=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
   const colCard=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
-  kTotal.textContent=fmt(T); kCash.textContent=fmt(C+colCash+DBT); kVirtual.textContent=fmt(V+colCard);
-  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT);
-  kNoDebt.textContent=fmt(T); kWithDebt.textContent=fmt(T+DBT); kDebt.textContent=fmt(DBT);
+  const ND=collectedNonShared();  // deudas NO compartidas ya cobradas = ganancia neta 100% del negocio
+  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(C+colCash+DBT); kVirtual.textContent=fmt(V+colCard);
+  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT+ND);
+  kNoDebt.textContent=fmt(T+ND); kWithDebt.textContent=fmt(T+ND+DBT); kDebt.textContent=fmt(DBT);
   const MK=days.reduce((a,d)=>a+mktVal(d),0); const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(MK);
 }
 
@@ -1113,7 +1129,7 @@ document.getElementById('importFile').onchange=e=>{
     const recs=rows.map(x=>({date:normDate(x.Fecha),cash:+x.Efectivo||0,virtual:+x.Cuenta||+x.Virtual||0,
       park:+x.Parqueadero||0, parkPct:x['% Parq.']!=null?+x['% Parq.']:0,
       expense:+x.Gastos||0,note:x.Detalle||x.Nota||'',
-      debt:+x.Debe||+x['Debe (original)']||0, debtPaid:+x.Cobrado||0, debtWho:x['Quién debe']||x.Quien||'',
+      debt:+x.Debe||+x['Debe (original)']||0, debtPaid:+x.Cobrado||0, debtWho:x['Quién debe']||x.Quien||'', debtShared:(String(x['Tipo deuda']||'').toLowerCase().indexOf('neto')>=0||String(x['Tipo deuda']||'').toLowerCase().indexOf('negocio')>=0)?false:true, debtReason:x['Motivo deuda']||'',
       washers:parseWashers(x['Lavadores (detalle)']),
       commPct:x['% Lavadores']!=null?+x['% Lavadores']:commPct,closed:true}))
       .filter(x=>x.date);
@@ -1135,9 +1151,9 @@ function exportExcel(){
   const rows=[...days].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
     Fecha:d.date,Efectivo:d.cash||0,Cuenta:d.virtual||0,Parqueadero:park(d),'Total del día':total(d),
     ['% Lavadores']:d.commPct??commPct,['% Parq.']:d.parkPct||0,'Lavadores':comm(d),'Negocio':biz(d),
-    Gastos:d.expense||0,Detalle:d.note||'','Debe (original)':d.debt||0,'Cobrado':d.debtPaid||0,'Deuda pendiente':debtOut(d),'Quién debe':d.debtWho||'','Marketing':mktVal(d),
+    Gastos:d.expense||0,Detalle:d.note||'','Debe (original)':d.debt||0,'Cobrado':d.debtPaid||0,'Deuda pendiente':debtOut(d),'Quién debe':d.debtWho||'','Tipo deuda':(d.debtShared===false?'Neto (100% negocio)':'Compartida'),'Motivo deuda':d.debtReason||'','Marketing':mktVal(d),
     'Lavadores (detalle)':washersToStr(d.washers),'Utilidad neta':net(d)}));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'',Detalle:'','Debe (original)':'','Cobrado':'','Deuda pendiente':'','Quién debe':'','Marketing':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'',Detalle:'','Debe (original)':'','Cobrado':'','Deuda pendiente':'','Quién debe':'','Tipo deuda':'','Motivo deuda':'','Marketing':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
   const T=days.reduce((a,d)=>a+total(d),0),C=days.reduce((a,d)=>a+(d.cash||0),0),V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0),CM=days.reduce((a,d)=>a+comm(d),0),EX=days.reduce((a,d)=>a+(d.expense||0),0),
         NT=days.reduce((a,d)=>a+net(d),0),DBT=days.reduce((a,d)=>a+debt(d),0);
