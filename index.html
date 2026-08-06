@@ -746,6 +746,7 @@ function renderKpis(){
 function aggWashers(){
   const map={}; let uProdPend=0,uPayPend=0,uProdPaid=0,uPayPaid=0,paidTotal=0,paidMonth=0;
   const cm=currentMonth();
+  const groups={};   // historial de pagos derivado de los días realmente pagados (clave = fecha de pago)
   const bump=k=>{ if(!map[k]) map[k]={produced:0,payTotal:0,payPending:0,payPaid:0}; return map[k]; };
   days.forEach(d=>{
     const pct=(num(d.commPct)||commPct)/100;
@@ -763,11 +764,17 @@ function aggWashers(){
       const pay=wash(d)*pct; dayPay+=pay;
       if(paidDay){ uProdPaid+=wash(d); uPayPaid+=pay; } else { uProdPend+=wash(d); uPayPend+=pay; }
     }
-    if(paidDay){ paidTotal+=dayPay; if(inMonth) paidMonth+=dayPay; }
+    if(paidDay){
+      paidTotal+=dayPay; if(inMonth) paidMonth+=dayPay;
+      const gk=(d.washPaidAt||'anterior');
+      if(!groups[gk]) groups[gk]={paidAt:(d.washPaidAt||''),count:0,total:0};
+      groups[gk].count+=1; groups[gk].total+=dayPay;
+    }
   });
   roster.forEach(n=>{ const k=(n||'').trim(); if(k) bump(k); });   // que todos los lavadores fijos aparezcan siempre
   const arr=Object.entries(map).map(([name,v])=>({name,...v})).sort((a,b)=>b.payPending-a.payPending||b.payTotal-a.payTotal);
-  return {map,arr,uProdPend,uPayPend,uProdPaid,uPayPaid,paidTotal,paidMonth};
+  const payHist=Object.values(groups).sort((a,b)=>(b.paidAt||'').localeCompare(a.paidAt||''));
+  return {map,arr,uProdPend,uPayPend,uProdPaid,uPayPaid,paidTotal,paidMonth,payHist};
 }
 /* ---------- "Ya pagué a los lavadores": pone el pendiente en cero (sin tocar ganancias) y registra el pago ---------- */
 async function payWashers(){
@@ -803,8 +810,8 @@ function renderWashersDash(){
   document.getElementById('wPay').textContent=fmt(totPay);
   document.getElementById('wPaidTot').textContent=fmt(w.paidTotal);
   document.getElementById('wPaidMonth').textContent=fmt(w.paidMonth);
-  const pg=[...pagos].sort((a,b)=>(b.paidAt||'').localeCompare(a.paidAt||''));
-  document.getElementById('pagosBody').innerHTML = pg.length? pg.map(p=>`<tr><td>${p.paidAt||''}</td><td class="num">${p.count||''}</td><td class="num pos">${fmt(p.total)}</td></tr>`).join('')
+  const pg=w.payHist||[];
+  document.getElementById('pagosBody').innerHTML = pg.length? pg.map(p=>`<tr><td>${p.paidAt||'Pago anterior'}</td><td class="num">${p.count||''}</td><td class="num pos">${fmt(p.total)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="empty">Aún no has registrado pagos.</td></tr>`;
 }
 
