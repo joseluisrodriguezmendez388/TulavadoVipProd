@@ -182,6 +182,32 @@ tr.has-debt{background:var(--artifact-red-soft)}
   .chart{height:240px!important}
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
+
+/* ---------- footer iluminado ---------- */
+.site-footer{margin:48px auto 0;max-width:1100px;padding:26px 20px 34px;text-align:center}
+.site-footer .fdev{
+  font-size:1.05rem;font-weight:800;letter-spacing:.02em;
+  background:linear-gradient(90deg,#5a8bff,#2dd4bf,#17915b,#5a8bff);
+  background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:footshine 6s linear infinite;
+}
+.site-footer .fname{
+  display:inline-block;margin-top:6px;font-size:1.5rem;font-weight:900;letter-spacing:.01em;
+  color:#fff;
+  text-shadow:0 0 6px rgba(90,139,255,.9),0 0 16px rgba(45,212,191,.7),0 0 28px rgba(90,139,255,.55);
+  animation:footglow 2.6s ease-in-out infinite alternate;
+}
+.site-footer .fsub{margin-top:8px;font-size:.8rem;color:var(--artifact-text-soft);letter-spacing:.03em}
+.site-footer .fline{width:120px;height:3px;margin:14px auto 0;border-radius:999px;
+  background:linear-gradient(90deg,transparent,#5a8bff,#2dd4bf,transparent);
+  animation:footshine 4s linear infinite}
+@keyframes footglow{
+  from{text-shadow:0 0 6px rgba(90,139,255,.7),0 0 14px rgba(45,212,191,.5),0 0 22px rgba(90,139,255,.4)}
+  to{text-shadow:0 0 12px rgba(90,139,255,1),0 0 26px rgba(45,212,191,.9),0 0 42px rgba(90,139,255,.75)}
+}
+@keyframes footshine{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+@media print{.site-footer{display:none!important}}
 </style>
 </head>
 <body>
@@ -191,6 +217,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <span id="cloudStatus" class="cloud wait">Conectando...</span>
     <button class="btn primary" onclick="openPark()">＋ Registrar parqueadero</button>
     <button class="btn" onclick="openCobro()">＄ Cobrar deuda</button>
+    <button class="btn" onclick="openCargar()">＋ Cargar deuda</button>
     <button class="btn bell" id="btnNotas" onclick="openNotas()"><span class="bell-ico">🔔</span> Pendientes<span class="dot" id="notasDot" style="display:none">0</span></button>
     <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
     <button class="btn" onclick="document.getElementById('importFile').click()">Importar Excel</button>
@@ -224,11 +251,16 @@ tr.has-debt{background:var(--artifact-red-soft)}
           <label class="field">Efectivo (caja)<input type="text" inputmode="numeric" id="fCash" placeholder="0" required autocomplete="off"></label>
           <label class="field">En cuenta (virtual)<input type="text" inputmode="numeric" id="fVirtual" placeholder="0" required autocomplete="off"></label>
           <label class="field">Gastos del día<input type="text" inputmode="numeric" id="fExpense" placeholder="0" autocomplete="off"></label>
+          <label class="field">Gastos: ¿cómo se pagó?<select id="fExpMethod"><option value="">— selecciona —</option><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="combinado">Combinado</option></select></label>
+          <label class="field" id="fExpCashWrap" style="display:none">Gasto en efectivo<input type="text" inputmode="numeric" id="fExpCash" placeholder="0" autocomplete="off"></label>
+          <label class="field" id="fExpCardWrap" style="display:none">Gasto en tarjeta<input type="text" inputmode="numeric" id="fExpCard" placeholder="0" autocomplete="off"></label>
           <label class="field">¿A qué se pagó?<input id="fNote" placeholder="Insumos, servicios..."></label>
-          <label class="field debt">Se quedó debiendo<input type="text" inputmode="numeric" id="fDebt" placeholder="0" autocomplete="off"></label>
+          <label class="field debt">Se quedó debiendo (compartida 35/65)<input type="text" inputmode="numeric" id="fDebt" placeholder="0" autocomplete="off"></label>
           <label class="field debt">¿Quién quedó debiendo?<input id="fDebtWho" placeholder="Juan, Andrés..." autocomplete="off"></label>
-          <label class="field" style="flex-direction:row;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="fDebtNotShared" style="width:auto;flex:none"> Esta deuda NO es compartida con los lavadores (100% del negocio)</label>
-          <label class="field debt" id="fDebtReasonWrap" style="display:none">¿A qué se debe la deuda?<input id="fDebtReason" placeholder="Parqueadero, venta, etc." autocomplete="off"></label>
+          <label class="field" style="flex-direction:row;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="fDebtNet" style="width:auto;flex:none"> ¿Hay otra deuda donde el negocio recibe el 100%? (parqueadero, venta...)</label>
+          <label class="field debt netd" id="fDebtNetReasonWrap" style="display:none">¿Cuál fue? (motivo)<input id="fDebtNetReason" placeholder="Parqueadero, venta..." autocomplete="off"></label>
+          <label class="field debt netd" id="fDebtNetValueWrap" style="display:none">Valor (100% del negocio)<input type="text" inputmode="numeric" id="fDebtNetValue" placeholder="0" autocomplete="off"></label>
+          <label class="field debt netd" id="fDebtNetWhoWrap" style="display:none">¿Quién debe / a quién se le cobra?<input id="fDebtNetWho" placeholder="Nombre..." autocomplete="off"></label>
           <label class="field"><span class="chk-row"><input type="checkbox" id="fMkt"> ¿Cliente agendado por marketing?</span></label>
           <label class="field mkt-wrap" id="fMktWrap">Valor por marketing<input type="text" inputmode="numeric" id="fMktValue" placeholder="0" autocomplete="off"></label>
         </div>
@@ -273,8 +305,8 @@ tr.has-debt{background:var(--artifact-red-soft)}
   <section class="view" id="resumen">
     <div class="kpis">
       <div class="kpi accent"><div class="lbl">Total generado</div><div class="val" id="kTotal">$0</div><div class="sub">lavados + parqueadero</div></div>
-      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pendientes + cobradas en efectivo</div></div>
-      <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">virtual + deudas cobradas en tarjeta</div></div>
+      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pend. + cobros efectivo − gastos efectivo</div></div>
+      <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">virtual + cobros tarjeta − gastos tarjeta</div></div>
       <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
       <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
       <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
@@ -344,6 +376,13 @@ tr.has-debt{background:var(--artifact-red-soft)}
   </section>
 </div>
 
+<footer class="site-footer">
+  <div class="fdev">Desarrollado por</div>
+  <div class="fname">José Luis Rodríguez</div>
+  <div class="fline"></div>
+  <div class="fsub">Tu Lavado VIP · Contabilidad en la nube</div>
+</footer>
+
 <!-- MODAL PARQUEADERO -->
 <div class="modal-back" id="parkModal">
   <div class="modal">
@@ -399,6 +438,29 @@ tr.has-debt{background:var(--artifact-red-soft)}
   </div>
 </div>
 
+<!-- MODAL CARGAR DEUDA -->
+<div class="modal-back" id="cargarModal">
+  <div class="modal">
+    <h3>Cargar deuda a un día</h3>
+    <p class="sub">Agrega una deuda pendiente a un día ya registrado. Mientras está pendiente, la deuda se cuenta en el efectivo; cuando la cobres (botón "Cobrar deuda") decides si entró en efectivo o tarjeta.</p>
+    <form id="cargarForm">
+      <label class="field">Día<select id="lDay" required></select></label>
+      <label class="field">¿Qué % gana el negocio de esta deuda?<select id="lType">
+        <option value="shared" id="lOptShared">El negocio gana el 65% (compartida — lavadores 35%)</option>
+        <option value="net" id="lOptNet">El negocio gana el 100% (parqueadero, venta — sin comisión)</option>
+      </select></label>
+      <label class="field">Valor de la deuda<input type="text" inputmode="numeric" id="lValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">¿Quién debe?<input id="lWho" placeholder="Juan..." autocomplete="off"></label>
+      <label class="field" id="lReasonWrap">¿A qué se debe? (motivo)<input id="lReason" placeholder="Parqueadero, venta..." autocomplete="off"></label>
+      <p class="sub" id="lInfo" style="margin:-4px 0 0"></p>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeCargar()">Cancelar</button>
+        <button type="submit" class="btn primary">Cargar deuda</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- MODAL DAR VALE -->
 <div class="modal-back" id="valeModal">
   <div class="modal">
@@ -412,6 +474,23 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <div class="row">
         <button type="button" class="btn ghost" onclick="closeVale()">Cancelar</button>
         <button type="submit" class="btn primary">Guardar vale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL METODO DE GASTO (para gastos sin método asignado) -->
+<div class="modal-back" id="expModal">
+  <div class="modal">
+    <h3>¿Cómo se pagó este gasto?</h3>
+    <p class="sub" id="expInfo"></p>
+    <form id="expForm">
+      <label class="field">Método<select id="eMethod"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="combinado">Combinado</option></select></label>
+      <label class="field" id="eCashWrap" style="display:none">Gasto en efectivo<input type="text" inputmode="numeric" id="eCash" placeholder="0" autocomplete="off"></label>
+      <label class="field" id="eCardWrap" style="display:none">Gasto en tarjeta<input type="text" inputmode="numeric" id="eCard" placeholder="0" autocomplete="off"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeExpMethod()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar</button>
       </div>
     </form>
   </div>
@@ -469,9 +548,10 @@ const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleStri
 const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
 const digits = v => +(''+v).replace(/\D/g,'')||0;
 function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
-['fCash','fVirtual','fExpense','fDebt','fMktValue','pValue','cValue','vValue'].forEach(attachSep);
+['fCash','fVirtual','fExpense','fExpCash','fExpCard','fDebt','fDebtNetValue','fMktValue','pValue','cValue','vValue','eCash','eCard','lValue'].forEach(attachSep);
 let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,debt,debtWho,washers:[{name,amount}],commPct,closed}
 let commPct = 35;
+let loadedFromExisting = null;   // fecha cargada en el form para editar (evita duplicar cierres)
 let roster = ['Lavador 1','Lavador 2','Lavador 3'];  // lista fija de lavadores (persistida)
 let pagos = [];                                        // registros de pago a lavadores
 let cobros = [];                                       // registros de cobro de deudas
@@ -489,12 +569,26 @@ const biz   = d => total(d)-comm(d);                                            
 const net   = d => biz(d)-num(d.expense);                                          // utilidad neta
 const debt  = d => num(d.debt);                                                    // deuda original registrada
 const mktVal = d => d.mkt ? num(d.mktValue) : 0;                                    // ingreso atribuido a marketing ese día
-const debtOut = d => Math.max(0,num(d.debt)-num(d.debtPaid));                       // deuda pendiente por cobrar
-const isSharedDebt = d => d.debtShared!==false;                                    // por defecto la deuda es compartida con lavadores
-/* suma de cobros de deudas NO compartidas (100% negocio): son ganancia neta al cobrarse */
-function collectedNonShared(){
-  return cobros.reduce((a,c)=>{ const d=days.find(x=>x.date===c.dayDate); return a + ((d && d.debtShared===false)? num(c.amount):0); },0);
-}
+/* --- gastos por método (para descontar de la caja/cuenta correcta). Gasto antiguo sin método -> pendiente, no se descuenta hasta asignarlo. */
+const expCashOf = d => { const m=d.expMethod, e=num(d.expense); if(m==='efectivo')return e; if(m==='tarjeta')return 0; if(m==='combinado')return num(d.expCash); return 0; };
+const expCardOf = d => { const m=d.expMethod, e=num(d.expense); if(m==='tarjeta')return e; if(m==='combinado')return num(d.expCard); return 0; };
+const expUnknown = d => num(d.expense)>0 && !d.expMethod;
+/* --- dos buckets de deuda por dia --- 
+   Compartida (35/65): debt/debtWho/debtPaid.  Neta 100% negocio: debtNet/debtNetWho/debtNetReason/debtNetPaid.
+   Legacy: dias con debtShared===false guardaban su valor en debt/debtPaid -> se leen como deuda neta. */
+const shTot   = d => (d.debtShared===false)? 0 : num(d.debt);
+const shPaid  = d => (d.debtShared===false)? 0 : num(d.debtPaid);
+const ntTot   = d => (d.debtShared===false)? num(d.debt) : num(d.debtNet);
+const ntPaid  = d => (d.debtShared===false)? num(d.debtPaid) : num(d.debtNetPaid);
+const sharedOut = d => Math.max(0, shTot(d)-shPaid(d));                             // deuda compartida pendiente
+const netOut    = d => Math.max(0, ntTot(d)-ntPaid(d));                             // deuda 100% negocio pendiente
+const debtOut = d => sharedOut(d)+netOut(d);                                        // deuda total pendiente
+const ntWho   = d => (d.debtShared===false)? (d.debtWho||'') : (d.debtNetWho||'');
+const ntReason= d => (d.debtShared===false)? (d.debtReason||'') : (d.debtNetReason||'');
+/* un cobro pertenece al bucket neto? (legacy: por el tipo del dia) */
+function cobroIsNet(c){ if(c.bucket) return c.bucket==='net'; const d=days.find(x=>x.date===c.dayDate); return !!(d && d.debtShared===false); }
+/* suma de cobros de deudas 100% negocio ya cobradas: son ganancia neta */
+function collectedNonShared(){ return cobros.reduce((a,c)=>a+(cobroIsNet(c)?num(c.amount):0),0); }
 const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
 const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
 
@@ -502,8 +596,9 @@ const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));   
 async function closeDay(d){
   await setDoc(doc(db, COL_DAYS, d.date), {
     date:d.date, cash:d.cash, virtual:d.virtual, expense:d.expense,
+    expMethod:d.expMethod||'', expCash:d.expCash||0, expCard:d.expCard||0,
     note:d.note, debt:d.debt||0, debtWho:d.debtWho||'',
-    debtShared:(d.debtShared!==false), debtReason:d.debtReason||'',
+    debtShared:true, debtNet:d.debtNet||0, debtNetWho:d.debtNetWho||'', debtNetReason:d.debtNetReason||'',
     mkt:!!d.mkt, mktValue:d.mktValue||0,
     washers:d.washers||[],
     commPct:d.commPct, closed:true, updatedAt:Date.now()
@@ -656,24 +751,32 @@ document.getElementById('addWasher').onclick=()=>{ addWasherRow(); syncRosterFro
 /* ---------- marketing: mostrar/ocultar el valor según el checkbox ---------- */
 function toggleMkt(){ document.getElementById('fMktWrap').classList.toggle('show', document.getElementById('fMkt').checked); }
 document.getElementById('fMkt').addEventListener('change',toggleMkt);
-/* ---------- deuda: mostrar campo "a qué se debe" cuando NO es compartida ---------- */
-function toggleDebtShared(){ document.getElementById('fDebtReasonWrap').style.display = document.getElementById('fDebtNotShared').checked ? 'flex' : 'none'; }
-document.getElementById('fDebtNotShared').addEventListener('change',toggleDebtShared);
+/* ---------- deuda 100% negocio: mostrar campos motivo/valor/quien cuando esta marcada ---------- */
+function toggleDebtNet(){ const on=document.getElementById('fDebtNet').checked; ['fDebtNetReasonWrap','fDebtNetValueWrap','fDebtNetWhoWrap'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=on?'flex':'none';}); }
+document.getElementById('fDebtNet').addEventListener('change',toggleDebtNet);
+function toggleExpMethod(){ const comb=document.getElementById('fExpMethod').value==='combinado'; document.getElementById('fExpCashWrap').style.display=comb?'flex':'none'; document.getElementById('fExpCardWrap').style.display=comb?'flex':'none'; }
+document.getElementById('fExpMethod').addEventListener('change',toggleExpMethod);
 
 /* ---------- form cierre ---------- */
 document.getElementById('fDate').valueAsDate=new Date();
 /* Si el día seleccionado quedó en validación (con deuda), precargamos sus datos para poder cerrarlo. */
 document.getElementById('fDate').addEventListener('change',()=>{
   const ex=days.find(d=>d.date===fDate.value);
+  loadedFromExisting=null;
   if(ex && !isLocked(ex)){
     // Día ya registrado y todavía editable (con deuda o sin lavadores asignados): precargamos todo para completarlo.
     fCash.value=sep(ex.cash||0); fVirtual.value=sep(ex.virtual||0);
     fExpense.value=sep(ex.expense||0); fNote.value=ex.note||'';
-    fDebt.value=sep(ex.debt||0); fDebtWho.value=ex.debtWho||'';
-    document.getElementById('fDebtNotShared').checked=(ex.debtShared===false); fDebtReason.value=ex.debtReason||''; toggleDebtShared();
+    document.getElementById('fExpMethod').value=ex.expMethod||''; fExpCash.value=ex.expCash?sep(ex.expCash):''; fExpCard.value=ex.expCard?sep(ex.expCard):''; toggleExpMethod();
+    const legacyNet=ex.debtShared===false;
+    fDebt.value=sep(legacyNet?0:(ex.debt||0)); fDebtWho.value=legacyNet?'':(ex.debtWho||'');
+    const nAmt=legacyNet?num(ex.debt):num(ex.debtNet);
+    document.getElementById('fDebtNet').checked=nAmt>0;
+    fDebtNetValue.value=nAmt?sep(nAmt):''; fDebtNetReason.value=ntReason(ex); fDebtNetWho.value=ntWho(ex); toggleDebtNet();
     document.getElementById('fMkt').checked=!!ex.mkt; fMktValue.value=ex.mktValue?sep(ex.mktValue):''; toggleMkt();
     initWashers(ex.washers);
     updateWashCheck();
+    loadedFromExisting=fDate.value;   // marcamos que este día se cargó para editar (no es duplicado)
   }
 });
 document.getElementById('entryForm').onsubmit=async e=>{
@@ -682,6 +785,11 @@ document.getElementById('entryForm').onsubmit=async e=>{
   const ex = days.find(d=>d.date===fDate.value);
   if(isLocked(ex)){
     alert('El día '+fDate.value+' ya está cerrado, sin deudas y con lavadores asignados. Un cierre completo no se puede modificar.');
+    return;
+  }
+  // No se puede duplicar un cierre: si ya existe un cierre para esa fecha y NO lo cargaste para editar, bloquear.
+  if(ex && ex.closed && loadedFromExisting!==fDate.value){
+    alert('Ya existe un cierre para el día '+fDate.value+'. No se puede duplicar.\n\nSi necesitas completarlo o corregirlo, vuelve a seleccionar esa fecha (arriba) para editar el cierre existente.');
     return;
   }
   const washers=readWashers();
@@ -693,18 +801,32 @@ document.getElementById('entryForm').onsubmit=async e=>{
   }
   const mktOn=document.getElementById('fMkt').checked;
   if(mktOn && numVal(fMktValue)<=0){ alert('Marcaste que hubo cliente por marketing. Escribe el valor de marketing.'); return; }
+  const netOn=document.getElementById('fDebtNet').checked;
+  if(netOn && numVal(fDebtNetValue)<=0){ alert('Marcaste que hay una deuda 100% del negocio. Escribe el valor de esa deuda.'); return; }
+  const expTot=numVal(fExpense);
+  const expM=document.getElementById('fExpMethod').value;
+  let expCash=0, expCard=0;
+  if(expTot>0){
+    if(!expM){ alert('Indica cómo se pagaron los gastos del día: efectivo, tarjeta o combinado.'); return; }
+    if(expM==='efectivo'){ expCash=expTot; }
+    else if(expM==='tarjeta'){ expCard=expTot; }
+    else { expCash=numVal(fExpCash); expCard=numVal(fExpCard); if(expCash+expCard!==expTot){ alert('El gasto combinado no cuadra.\n\nEfectivo ('+fmt(expCash)+') + Tarjeta ('+fmt(expCard)+') debe ser exactamente igual al gasto total ('+fmt(expTot)+').'); return; } }
+  }
   const rec={date:fDate.value,cash:numVal(fCash),virtual:numVal(fVirtual),
-    expense:numVal(fExpense),note:fNote.value.trim(),
+    expense:numVal(fExpense),expMethod:expTot>0?expM:'',expCash:expCash,expCard:expCard,note:fNote.value.trim(),
     debt:numVal(fDebt),debtWho:fDebtWho.value.trim(),
-    debtShared:!document.getElementById('fDebtNotShared').checked, debtReason:fDebtReason.value.trim(),
+    debtShared:true,
+    debtNet:netOn?numVal(fDebtNetValue):0, debtNetWho:netOn?fDebtNetWho.value.trim():'', debtNetReason:netOn?fDebtNetReason.value.trim():'',
     mkt:mktOn, mktValue:mktOn?numVal(fMktValue):0,
     washers, commPct:commPct};
   try{
     await closeDay(rec);
     syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
     fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
-    document.getElementById('fDebtNotShared').checked=false; fDebtReason.value=''; toggleDebtShared();
+    document.getElementById('fExpMethod').value=''; fExpCash.value=''; fExpCard.value=''; toggleExpMethod();
+    document.getElementById('fDebtNet').checked=false; fDebtNetValue.value=''; fDebtNetReason.value=''; fDebtNetWho.value=''; toggleDebtNet();
     document.getElementById('fMkt').checked=false; fMktValue.value=''; toggleMkt();
+    loadedFromExisting=null;
     initWashers();
   }catch(err){ alert('No se pudo guardar en la nube: '+err.message); }
 };
@@ -778,37 +900,141 @@ window.assignWashers=assignWashers;
 window.closeAssign=closeAssign;
 
 /* ---------- modal COBRAR DEUDA ---------- */
-function openCobro(preDate){
-  const list=days.filter(d=>debtOut(d)>0).sort((a,b)=>a.date.localeCompare(b.date));
+function debtEntries(){
+  const out=[];
+  [...days].sort((a,b)=>a.date.localeCompare(b.date)).forEach(d=>{
+    if(sharedOut(d)>0) out.push({date:d.date,bucket:'shared',amount:sharedOut(d)});
+    if(netOut(d)>0)    out.push({date:d.date,bucket:'net',amount:netOut(d)});
+  });
+  return out;
+}
+function curCobro(){ const [date,bucket]=(document.getElementById('cDay').value||'').split('|'); return {d:days.find(x=>x.date===date),bucket:bucket||'shared'}; }
+function openCobro(preDate,preBucket){
+  const list=debtEntries();
   if(!list.length){ alert('No hay deudas pendientes por cobrar. Todos los días están consolidados.'); return; }
   const sel=document.getElementById('cDay');
-  sel.innerHTML=list.map(d=>`<option value="${d.date}">${d.date} — debe ${fmt(debtOut(d))}${d.debtShared===false?' (100% negocio)':''}</option>`).join('');
-  if(preDate && list.some(d=>d.date===preDate)) sel.value=preDate;
+  sel.innerHTML=list.map(e=>`<option value="${e.date}|${e.bucket}">${e.date} — ${e.bucket==='net'?'100% negocio':'compartida'}: debe ${fmt(e.amount)}</option>`).join('');
+  if(preDate){ const v=preDate+'|'+(preBucket||'shared'); if(list.some(e=>e.date+'|'+e.bucket===v)) sel.value=v; }
   cValue.value=''; cWho.value='';
   updateCobroInfo();
   document.getElementById('cobroModal').classList.add('open');
 }
 function updateCobroInfo(){
-  const d=days.find(x=>x.date===cDay.value);
-  document.getElementById('cInfo').textContent = d ? ('Deuda pendiente de ese día: '+fmt(debtOut(d))+(d.debtShared===false?' · 100% del negocio (sin comisión)'+(d.debtReason?' — '+d.debtReason:''):(d.debtWho?' · quedó debiendo: '+d.debtWho:''))) : '';
+  const {d,bucket}=curCobro();
+  if(!d){ document.getElementById('cInfo').textContent=''; return; }
+  const out=bucket==='net'?netOut(d):sharedOut(d);
+  const who=bucket==='net'?ntWho(d):(d.debtWho||'');
+  const reason=bucket==='net'?ntReason(d):'';
+  document.getElementById('cInfo').textContent='Deuda pendiente ('+(bucket==='net'?'100% del negocio — sin comisión':'compartida — negocio '+(100-commPct)+'%')+'): '+fmt(out)+(reason?' — '+reason:'')+(who?' · '+who:'');
 }
 function closeCobro(){ document.getElementById('cobroModal').classList.remove('open'); }
 document.getElementById('cDay').addEventListener('change',updateCobroInfo);
 document.getElementById('cobroModal').addEventListener('click',e=>{ if(e.target.id==='cobroModal') closeCobro(); });
 document.getElementById('cobroForm').onsubmit=async e=>{
   e.preventDefault();
-  const d=days.find(x=>x.date===cDay.value); if(!d){ closeCobro(); return; }
-  const val=numVal(cValue), out=debtOut(d);
+  const {d,bucket}=curCobro(); if(!d){ closeCobro(); return; }
+  const val=numVal(cValue), out=bucket==='net'?netOut(d):sharedOut(d);
   if(val<=0){ alert('Ingresa el valor cobrado.'); return; }
-  if(val>out){ alert('No puedes cobrar más de lo que deben.\n\nDeuda pendiente de ese día: '+fmt(out)+'.'); return; }
+  if(val>out){ alert('No puedes cobrar más de lo que deben.\n\nDeuda pendiente: '+fmt(out)+'.'); return; }
   try{
     const method=(document.getElementById('cMethod').value==='tarjeta')?'tarjeta':'efectivo';
-    await setDoc(doc(db,COL_DAYS,d.date),{debtPaid:(d.debtPaid||0)+val,updatedAt:Date.now()},{merge:true});
-    await addDoc(collection(db,'cobros'),{dayDate:d.date,amount:val,who:cWho.value.trim(),method:method,paidAt:new Date().toISOString().slice(0,10),createdAt:Date.now()});
+    if(bucket==='net'){
+      const legacy=d.debtShared===false;
+      const field=legacy?'debtPaid':'debtNetPaid';
+      const cur=legacy?num(d.debtPaid):num(d.debtNetPaid);
+      await setDoc(doc(db,COL_DAYS,d.date),{[field]:cur+val,updatedAt:Date.now()},{merge:true});
+    } else {
+      await setDoc(doc(db,COL_DAYS,d.date),{debtPaid:num(d.debtPaid)+val,updatedAt:Date.now()},{merge:true});
+    }
+    await addDoc(collection(db,'cobros'),{dayDate:d.date,bucket:bucket,amount:val,who:cWho.value.trim(),method:method,paidAt:new Date().toISOString().slice(0,10),createdAt:Date.now()});
     closeCobro();
   }catch(err){ alert('No se pudo registrar el cobro: '+err.message); }
 };
 window.openCobro=openCobro; window.closeCobro=closeCobro;
+
+/* ---------- CARGAR DEUDA (agregar una deuda a un día) ---------- */
+function joinWho(a,b){ return [a,b].map(x=>(x||'').trim()).filter(Boolean).join(', '); }
+function openCargar(){
+  const list=[...days].sort((a,b)=>b.date.localeCompare(a.date));
+  if(!list.length){ alert('Primero registra al menos un día en el cierre.'); return; }
+  const sel=document.getElementById('lDay');
+  sel.innerHTML=list.map(d=>`<option value="${d.date}">${d.date}${debtOut(d)>0?' — ya debe '+fmt(debtOut(d)):''}</option>`).join('');
+  lValue.value=''; lWho.value=''; lReason.value='';
+  const bp=100-commPct;
+  const os=document.getElementById('lOptShared'); if(os) os.textContent='El negocio gana el '+bp+'% (compartida — lavadores '+commPct+'%)';
+  document.getElementById('lType').value='shared';
+  updateCargarUI();
+  document.getElementById('cargarModal').classList.add('open');
+}
+function updateCargarUI(){
+  const isNet=document.getElementById('lType').value==='net';
+  document.getElementById('lReasonWrap').style.display=isNet?'':'none';
+  const d=days.find(x=>x.date===lDay.value);
+  document.getElementById('lInfo').textContent = d?('Deuda actual de ese día: compartida '+fmt(sharedOut(d))+' · 100% negocio '+fmt(netOut(d))):'';
+}
+function closeCargar(){ document.getElementById('cargarModal').classList.remove('open'); }
+document.getElementById('lType').addEventListener('change',updateCargarUI);
+document.getElementById('lDay').addEventListener('change',updateCargarUI);
+document.getElementById('cargarModal').addEventListener('click',e=>{ if(e.target.id==='cargarModal') closeCargar(); });
+document.getElementById('cargarForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===lDay.value); if(!d){ closeCargar(); return; }
+  const val=numVal(lValue); if(val<=0){ alert('Ingresa el valor de la deuda.'); return; }
+  const bucket=document.getElementById('lType').value==='net'?'net':'shared';
+  const who=lWho.value.trim(), reason=lReason.value.trim();
+  // Normalizamos el día (arregla días legacy) y sumamos al bucket elegido, respetando lo ya cobrado.
+  const curShTot=shTot(d), curShPaid=shPaid(d), curShWho=(d.debtShared===false)?'':(d.debtWho||'');
+  const curNtTot=ntTot(d), curNtPaid=ntPaid(d), curNtWho=ntWho(d), curNtReason=ntReason(d);
+  const payload={
+    debtShared:true,
+    debt: curShTot + (bucket==='shared'?val:0),
+    debtPaid: curShPaid,
+    debtWho: bucket==='shared'? joinWho(curShWho,who) : curShWho,
+    debtNet: curNtTot + (bucket==='net'?val:0),
+    debtNetPaid: curNtPaid,
+    debtNetWho: bucket==='net'? joinWho(curNtWho,who) : curNtWho,
+    debtNetReason: bucket==='net'? (reason||curNtReason) : curNtReason,
+    updatedAt:Date.now()
+  };
+  try{
+    await setDoc(doc(db,COL_DAYS,d.date), payload, {merge:true});
+    closeCargar();
+    alert('Deuda cargada: '+fmt(val)+(bucket==='net'?' (100% del negocio)':' (negocio '+(100-commPct)+'% / lavadores '+commPct+'%)')+' al día '+d.date+'.');
+  }catch(err){ alert('No se pudo cargar la deuda: '+err.message); }
+};
+window.openCargar=openCargar; window.closeCargar=closeCargar;
+
+/* ---------- gastos: método de pago (efectivo/tarjeta/combinado) ---------- */
+function expenseCellHTML(d){
+  const e=num(d.expense); if(e<=0) return fmt(0);
+  if(expUnknown(d)) return fmt(e)+'<button type="button" class="mini-btn" onclick="openExpMethod(\''+d.date+'\')">¿tarjeta o efectivo?</button>';
+  const m=d.expMethod;
+  const tag = (m==='combinado') ? ('<span class="debt-who">ef '+fmt(num(d.expCash))+' · tj '+fmt(num(d.expCard))+'</span>')
+            : ('<span class="debt-who">'+(m==='tarjeta'?'tarjeta':'efectivo')+'</span>');
+  return fmt(e)+tag;
+}
+let expAssignDate=null;
+function openExpMethod(date){
+  const d=days.find(x=>x.date===date); if(!d) return;
+  expAssignDate=date;
+  document.getElementById('expInfo').textContent='Día '+date+' · gasto de '+fmt(num(d.expense))+'. Indica cómo se pagó para cuadrar la caja.';
+  eMethod.value='efectivo'; eCash.value=''; eCard.value=''; toggleExpModal();
+  document.getElementById('expModal').classList.add('open');
+}
+function closeExpMethod(){ document.getElementById('expModal').classList.remove('open'); expAssignDate=null; }
+function toggleExpModal(){ const comb=eMethod.value==='combinado'; document.getElementById('eCashWrap').style.display=comb?'flex':'none'; document.getElementById('eCardWrap').style.display=comb?'flex':'none'; }
+document.getElementById('eMethod').addEventListener('change',toggleExpModal);
+document.getElementById('expModal').addEventListener('click',e=>{ if(e.target.id==='expModal') closeExpMethod(); });
+document.getElementById('expForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===expAssignDate); if(!d){ closeExpMethod(); return; }
+  const tot=num(d.expense), m=eMethod.value; let ec=0,ed=0;
+  if(m==='efectivo') ec=tot; else if(m==='tarjeta') ed=tot;
+  else { ec=numVal(eCash); ed=numVal(eCard); if(ec+ed!==tot){ alert('El gasto combinado no cuadra.\n\nEfectivo ('+fmt(ec)+') + Tarjeta ('+fmt(ed)+') debe ser igual al gasto ('+fmt(tot)+').'); return; } }
+  try{ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:m,expCash:ec,expCard:ed,updatedAt:Date.now()},{merge:true}); closeExpMethod(); }
+  catch(err){ alert('No se pudo guardar: '+err.message); }
+};
+window.openExpMethod=openExpMethod; window.closeExpMethod=closeExpMethod;
 
 /* ---------- vales (adelantos a lavadores) ---------- */
 function washerOptions(){
@@ -878,6 +1104,13 @@ async function markNotesSeen(){
 window.openNotas=openNotas; window.closeNotas=closeNotas; window.markNotesSeen=markNotesSeen;
 
 /* ---------- render table ---------- */
+function debtCellHTML(d){
+  const shO=sharedOut(d), ntO=netOut(d);
+  let h='';
+  if(shO>0){ h+=`<div>${fmt(shO)}${d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:''}<button type="button" class="mini-btn red" onclick="openCobro('${d.date}','shared')">Cobrar</button></div>`; }
+  if(ntO>0){ const r=ntReason(d), w=ntWho(d); h+=`<div style="margin-top:${shO>0?'6px':'0'}">${fmt(ntO)} <span class="badge-net">100% negocio</span>${(r||w)?`<span class="debt-who">${[r,w].filter(Boolean).join(' · ')}</span>`:''}<button type="button" class="mini-btn red" onclick="openCobro('${d.date}','net')">Cobrar</button></div>`; }
+  return h;
+}
 function renderDays(){
   const rows=[...days].sort((a,b)=>b.date.localeCompare(a.date));
   const b=document.getElementById('dayBody');
@@ -896,9 +1129,9 @@ function renderDays(){
     <td class="num">${fmt(total(d))}</td>
     <td class="num">${fmt(comm(d))}</td>
     <td class="num">${fmt(biz(d))}</td>
-    <td class="num">${fmt(d.expense)}</td>
+    <td class="num">${expenseCellHTML(d)}</td>
     <td>${d.note||''}</td>
-    <td class="num debt-col">${hasDebt?fmt(out):''}${hasDebt?(d.debtShared===false?`<span class="debt-who"><span class="badge-net">100% negocio</span>${d.debtReason?' '+d.debtReason:''}</span>`:(d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:'')):''}${hasDebt?`<button type="button" class="mini-btn red" onclick="openCobro('${d.date}')">Cobrar deuda</button>`:''}</td>
+    <td class="num debt-col">${debtCellHTML(d)}</td>
     <td class="num ${net(d)>=0?'pos':'neg'}">${fmt(net(d))}</td></tr>`;}).join('')
     : `<tr><td colspan="11" class="empty">Aún no hay días registrados. Agrega tu primer cierre arriba para empezar.</td></tr>`;
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
@@ -920,7 +1153,8 @@ function renderKpis(){
   const colCash=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
   const colCard=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
   const ND=collectedNonShared();  // deudas NO compartidas ya cobradas = ganancia neta 100% del negocio
-  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(C+colCash+DBT); kVirtual.textContent=fmt(V+colCard);
+  const expC=days.reduce((a,d)=>a+expCashOf(d),0), expV=days.reduce((a,d)=>a+expCardOf(d),0);  // gastos ya descontados por método
+  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(C+colCash+DBT-expC); kVirtual.textContent=fmt(V+colCard-expV);
   kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT+ND);
   kNoDebt.textContent=fmt(T+ND); kWithDebt.textContent=fmt(T+ND+DBT); kDebt.textContent=fmt(DBT);
   const MK=days.reduce((a,d)=>a+mktVal(d),0); const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(MK);
@@ -1024,7 +1258,7 @@ async function resetPay(){
   const paid=days.filter(d=>!!d.washPaid);
   if(!paid.length){ alert('No hay pagos registrados para resetear.'); return; }
   if(!requirePass()) return;
-  const pct=d=>(num(d.commPct)||commPct)/100;
+const pct=d=>(num(d.commPct)||commPct)/100;
   const total=Math.round(paid.reduce((a,d)=>{
     const p=(Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
     return a+p*pct(d);
@@ -1128,8 +1362,8 @@ document.getElementById('importFile').onchange=e=>{
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[sh]);
     const recs=rows.map(x=>({date:normDate(x.Fecha),cash:+x.Efectivo||0,virtual:+x.Cuenta||+x.Virtual||0,
       park:+x.Parqueadero||0, parkPct:x['% Parq.']!=null?+x['% Parq.']:0,
-      expense:+x.Gastos||0,note:x.Detalle||x.Nota||'',
-      debt:+x.Debe||+x['Debe (original)']||0, debtPaid:+x.Cobrado||0, debtWho:x['Quién debe']||x.Quien||'', debtShared:(String(x['Tipo deuda']||'').toLowerCase().indexOf('neto')>=0||String(x['Tipo deuda']||'').toLowerCase().indexOf('negocio')>=0)?false:true, debtReason:x['Motivo deuda']||'',
+      expense:+x.Gastos||0,expMethod:x['Gasto método']||'',expCash:+x['Gasto efectivo']||0,expCard:+x['Gasto tarjeta']||0,note:x.Detalle||x.Nota||'',
+      debt:+x['Debe compartida']||+x.Debe||+x['Debe (original)']||0, debtPaid:+x['Cobrado compartida']||+x.Cobrado||0, debtWho:x['Quién debe']||x.Quien||'', debtShared:true, debtNet:+x['Debe neto (100%)']||0, debtNetPaid:+x['Cobrado neto']||0, debtNetWho:x['Quién debe neto']||'', debtNetReason:x['Motivo neto']||x['Motivo deuda']||'',
       washers:parseWashers(x['Lavadores (detalle)']),
       commPct:x['% Lavadores']!=null?+x['% Lavadores']:commPct,closed:true}))
       .filter(x=>x.date);
@@ -1151,12 +1385,12 @@ function exportExcel(){
   const rows=[...days].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
     Fecha:d.date,Efectivo:d.cash||0,Cuenta:d.virtual||0,Parqueadero:park(d),'Total del día':total(d),
     ['% Lavadores']:d.commPct??commPct,['% Parq.']:d.parkPct||0,'Lavadores':comm(d),'Negocio':biz(d),
-    Gastos:d.expense||0,Detalle:d.note||'','Debe (original)':d.debt||0,'Cobrado':d.debtPaid||0,'Deuda pendiente':debtOut(d),'Quién debe':d.debtWho||'','Tipo deuda':(d.debtShared===false?'Neto (100% negocio)':'Compartida'),'Motivo deuda':d.debtReason||'','Marketing':mktVal(d),
+    Gastos:d.expense||0,'Gasto método':d.expMethod||'','Gasto efectivo':expCashOf(d),'Gasto tarjeta':expCardOf(d),Detalle:d.note||'','Debe compartida':shTot(d),'Cobrado compartida':shPaid(d),'Pend. compartida':sharedOut(d),'Quién debe':d.debtWho||'','Debe neto (100%)':ntTot(d),'Cobrado neto':ntPaid(d),'Pend. neto':netOut(d),'Motivo neto':ntReason(d),'Quién debe neto':ntWho(d),'Marketing':mktVal(d),
     'Lavadores (detalle)':washersToStr(d.washers),'Utilidad neta':net(d)}));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'',Detalle:'','Debe (original)':'','Cobrado':'','Deuda pendiente':'','Quién debe':'','Tipo deuda':'','Motivo deuda':'','Marketing':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'','Gasto método':'','Gasto efectivo':'','Gasto tarjeta':'',Detalle:'','Debe compartida':'','Cobrado compartida':'','Pend. compartida':'','Quién debe':'','Debe neto (100%)':'','Cobrado neto':'','Pend. neto':'','Motivo neto':'','Quién debe neto':'','Marketing':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
   const T=days.reduce((a,d)=>a+total(d),0),C=days.reduce((a,d)=>a+(d.cash||0),0),V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0),CM=days.reduce((a,d)=>a+comm(d),0),EX=days.reduce((a,d)=>a+(d.expense||0),0),
-        NT=days.reduce((a,d)=>a+net(d),0),DBT=days.reduce((a,d)=>a+debt(d),0);
+        NT=days.reduce((a,d)=>a+net(d),0),DBT=days.reduce((a,d)=>a+debtOut(d),0);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([
     {Concepto:'Total generado',Valor:T},{Concepto:'En efectivo',Valor:C},{Concepto:'En cuenta',Valor:V},
     {Concepto:'Parqueadero',Valor:P},{Concepto:'Lavadores',Valor:CM},{Concepto:'Gastos',Valor:EX},{Concepto:'Utilidad negocio neta',Valor:NT},
@@ -1200,4 +1434,12 @@ initWashers();
 refreshPctLabels(); renderAll(); renderNotasBadge(); setTimeout(renderCharts,100);
 </script>
 </body>
+
+
+
+
+
+
+
+
 </html>
