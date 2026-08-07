@@ -126,6 +126,11 @@ tr.has-debt{background:var(--artifact-red-soft)}
 .modal p.sub{margin:0 0 16px;font-size:.82rem;color:var(--artifact-text-soft)}
 .modal form{display:grid;gap:12px}
 .modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+.cargar-info{font-size:.82rem;background:var(--artifact-accent-soft);border:1px solid var(--artifact-accent);color:var(--artifact-text);border-radius:10px;padding:10px 12px;line-height:1.5}
+.cargar-info b{font-weight:700}
+.cargar-info .ci-title{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--artifact-text-soft);font-weight:700;margin-bottom:4px}
+.cargar-info .ci-sh{color:var(--artifact-amber)}
+.cargar-info .ci-nt{color:var(--artifact-green)}
 .bell{position:relative}
 .bell .dot{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--artifact-red);color:#fff;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid var(--artifact-background)}
 .btn.bell.hasnew{border-color:var(--artifact-red);color:var(--artifact-red);background:var(--artifact-red-soft);font-weight:800;animation:bellshake .8s infinite}
@@ -219,10 +224,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <button class="btn" onclick="openCobro()">＄ Cobrar deuda</button>
     <button class="btn" onclick="openCargar()">＋ Cargar deuda</button>
     <button class="btn bell" id="btnNotas" onclick="openNotas()"><span class="bell-ico">🔔</span> Pendientes<span class="dot" id="notasDot" style="display:none">0</span></button>
-    <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
-    <button class="btn" onclick="document.getElementById('importFile').click()">Importar Excel</button>
     <button class="btn" onclick="exportExcel()">Exportar Excel</button>
-    <button class="btn ghost" onclick="downloadTemplate()">Plantilla</button>
   </div>
 </header>
 
@@ -445,14 +447,14 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <p class="sub">Agrega una deuda pendiente a un día ya registrado. Mientras está pendiente, la deuda se cuenta en el efectivo; cuando la cobres (botón "Cobrar deuda") decides si entró en efectivo o tarjeta.</p>
     <form id="cargarForm">
       <label class="field">Día<select id="lDay" required></select></label>
+      <div class="cargar-info" id="lInfo"></div>
       <label class="field">¿Qué % gana el negocio de esta deuda?<select id="lType">
         <option value="shared" id="lOptShared">El negocio gana el 65% (compartida — lavadores 35%)</option>
         <option value="net" id="lOptNet">El negocio gana el 100% (parqueadero, venta — sin comisión)</option>
       </select></label>
-      <label class="field">Valor de la deuda<input type="text" inputmode="numeric" id="lValue" placeholder="0" required autocomplete="off"></label>
-      <label class="field">¿Quién debe?<input id="lWho" placeholder="Juan..." autocomplete="off"></label>
       <label class="field" id="lReasonWrap">¿A qué se debe? (motivo)<input id="lReason" placeholder="Parqueadero, venta..." autocomplete="off"></label>
-      <p class="sub" id="lInfo" style="margin:-4px 0 0"></p>
+      <label class="field">Valor de la deuda<input type="text" inputmode="numeric" id="lValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">¿Quién debe?<input id="lWho" placeholder="Juan, Andrés..." autocomplete="off"></label>
       <div class="row">
         <button type="button" class="btn ghost" onclick="closeCargar()">Cancelar</button>
         <button type="submit" class="btn primary">Cargar deuda</button>
@@ -763,8 +765,8 @@ document.getElementById('fDate').valueAsDate=new Date();
 document.getElementById('fDate').addEventListener('change',()=>{
   const ex=days.find(d=>d.date===fDate.value);
   loadedFromExisting=null;
-  if(ex && !isLocked(ex)){
-    // Día ya registrado y todavía editable (con deuda o sin lavadores asignados): precargamos todo para completarlo.
+  if(ex){
+    // Día ya registrado: precargamos todo para VER lo que se guardó (el cierre no se puede repetir).
     fCash.value=sep(ex.cash||0); fVirtual.value=sep(ex.virtual||0);
     fExpense.value=sep(ex.expense||0); fNote.value=ex.note||'';
     document.getElementById('fExpMethod').value=ex.expMethod||''; fExpCash.value=ex.expCash?sep(ex.expCash):''; fExpCard.value=ex.expCard?sep(ex.expCard):''; toggleExpMethod();
@@ -783,13 +785,9 @@ document.getElementById('entryForm').onsubmit=async e=>{
   e.preventDefault();
   if(!fDate.value){ alert('Selecciona una fecha.'); return; }
   const ex = days.find(d=>d.date===fDate.value);
-  if(isLocked(ex)){
-    alert('El día '+fDate.value+' ya está cerrado, sin deudas y con lavadores asignados. Un cierre completo no se puede modificar.');
-    return;
-  }
-  // No se puede duplicar un cierre: si ya existe un cierre para esa fecha y NO lo cargaste para editar, bloquear.
-  if(ex && ex.closed && loadedFromExisting!==fDate.value){
-    alert('Ya existe un cierre para el día '+fDate.value+'. No se puede duplicar.\n\nSi necesitas completarlo o corregirlo, vuelve a seleccionar esa fecha (arriba) para editar el cierre existente.');
+  // Un día se cierra UNA sola vez: si ya existe un cierre para esa fecha, no se puede volver a cerrar ni modificar.
+  if(ex && ex.closed){
+    alert('El día '+fDate.value+' ya tiene un cierre registrado.\n\nUn día solo se cierra UNA vez: no se puede volver a cerrar ni modificar. Estás viendo la información que quedó guardada ese día.\n\nSi necesitas hacer algún cambio, habla con el administrador y creador de este software: José Luis Rodríguez.');
     return;
   }
   const washers=readWashers();
@@ -970,7 +968,13 @@ function updateCargarUI(){
   const isNet=document.getElementById('lType').value==='net';
   document.getElementById('lReasonWrap').style.display=isNet?'':'none';
   const d=days.find(x=>x.date===lDay.value);
-  document.getElementById('lInfo').textContent = d?('Deuda actual de ese día: compartida '+fmt(sharedOut(d))+' · 100% negocio '+fmt(netOut(d))):'';
+  const el=document.getElementById('lInfo');
+  if(!d){ el.innerHTML='<span class="ci-title">Deuda actual del día</span>Selecciona un día.'; return; }
+  const sh=sharedOut(d), nt=netOut(d), tot=sh+nt;
+  el.innerHTML='<span class="ci-title">Deuda actual del día '+d.date+'</span>'+
+    (tot>0
+      ? 'Compartida (65/35): <b class="ci-sh">'+fmt(sh)+'</b><br>100% negocio: <b class="ci-nt">'+fmt(nt)+'</b>'
+      : 'Este día no tiene deuda pendiente. La nueva deuda quedará <b>en validación</b> hasta que la cobres.');
 }
 function closeCargar(){ document.getElementById('cargarModal').classList.remove('open'); }
 document.getElementById('lType').addEventListener('change',updateCargarUI);
@@ -1258,7 +1262,7 @@ async function resetPay(){
   const paid=days.filter(d=>!!d.washPaid);
   if(!paid.length){ alert('No hay pagos registrados para resetear.'); return; }
   if(!requirePass()) return;
-const pct=d=>(num(d.commPct)||commPct)/100;
+  const pct=d=>(num(d.commPct)||commPct)/100;
   const total=Math.round(paid.reduce((a,d)=>{
     const p=(Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
     return a+p*pct(d);
@@ -1353,33 +1357,6 @@ function renderAll(){
 
 /* ---------- Excel ---------- */
 function washersToStr(list){ return (list||[]).map(w=>`${w.name||''}:${w.amount||0}`).join(' | '); }
-function parseWashers(s){ if(!s)return []; return (''+s).split('|').map(p=>{const i=p.lastIndexOf(':');const n=i>=0?p.slice(0,i):p;const a=i>=0?p.slice(i+1):'';return {name:(n||'').trim(),amount:digits(a)};}).filter(w=>w.name||w.amount); }
-document.getElementById('importFile').onchange=e=>{
-  const f=e.target.files[0];if(!f)return;const r=new FileReader();
-  r.onload=async ev=>{
-    const wb=XLSX.read(ev.target.result,{type:'array'});
-    const sh = wb.SheetNames.includes('CierreDiario')?'CierreDiario':wb.SheetNames[0];
-    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sh]);
-    const recs=rows.map(x=>({date:normDate(x.Fecha),cash:+x.Efectivo||0,virtual:+x.Cuenta||+x.Virtual||0,
-      park:+x.Parqueadero||0, parkPct:x['% Parq.']!=null?+x['% Parq.']:0,
-      expense:+x.Gastos||0,expMethod:x['Gasto método']||'',expCash:+x['Gasto efectivo']||0,expCard:+x['Gasto tarjeta']||0,note:x.Detalle||x.Nota||'',
-      debt:+x['Debe compartida']||+x.Debe||+x['Debe (original)']||0, debtPaid:+x['Cobrado compartida']||+x.Cobrado||0, debtWho:x['Quién debe']||x.Quien||'', debtShared:true, debtNet:+x['Debe neto (100%)']||0, debtNetPaid:+x['Cobrado neto']||0, debtNetWho:x['Quién debe neto']||'', debtNetReason:x['Motivo neto']||x['Motivo deuda']||'',
-      washers:parseWashers(x['Lavadores (detalle)']),
-      commPct:x['% Lavadores']!=null?+x['% Lavadores']:commPct,closed:true}))
-      .filter(x=>x.date);
-    try{
-      setStatus("wait","Subiendo "+recs.length+"...");
-      for(const rec of recs){ await setDoc(doc(db,COL_DAYS,rec.date), {...rec, updatedAt:Date.now()}, {merge:true}); }
-      alert('Excel importado a la nube: '+recs.length+' días.');
-    }catch(err){ alert('Error subiendo el Excel: '+err.message); }
-  };
-  r.readAsArrayBuffer(f);e.target.value='';
-};
-function normDate(v){
-  if(!v)return '';
-  if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);if(d)return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}
-  return (''+v).slice(0,10);
-}
 function exportExcel(){
   const wb=XLSX.utils.book_new();
   const rows=[...days].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
@@ -1409,15 +1386,7 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(nrows.length?nrows:[{Fecha:'',Autor:'',Nota:'',Estado:''}]),'Notas');
   XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
-function downloadTemplate(){
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
-    ['Fecha','Efectivo','Cuenta','Parqueadero','Gastos','Detalle','Debe','Quién debe','Lavadores (detalle)','% Lavadores','% Parq.']
-  ]),'CierreDiario');
-  XLSX.writeFile(wb,'plantilla_lavado_vip.xlsx');
-}
 window.exportExcel=exportExcel;
-window.downloadTemplate=downloadTemplate;
 window.openPark=openPark;
 window.closePark=closePark;
 
@@ -1434,12 +1403,4 @@ initWashers();
 refreshPctLabels(); renderAll(); renderNotasBadge(); setTimeout(renderCharts,100);
 </script>
 </body>
-
-
-
-
-
-
-
-
 </html>
