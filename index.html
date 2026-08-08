@@ -552,7 +552,7 @@ const fmt = n => COP.format(Math.round(n||0));
 const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleString('es-CO') : ''; };   // 1200000 -> "1.200.000"
 const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
 const digits = v => +(''+v).replace(/\D/g,'')||0;
-function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
+functionattachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
 ['fCash','fVirtual','fExpense','fExpCash','fExpCard','fDebt','fDebtNetValue','fMktValue','pValue','cValue','vValue','eCash','eCard','lValue'].forEach(attachSep);
 let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,debt,debtWho,washers:[{name,amount}],commPct,closed}
 let commPct = 35;
@@ -625,6 +625,7 @@ onSnapshot(collection(db, COL_DAYS),
     days = snap.docs.map(x => ({ id:x.id, ...x.data() }));
     setStatus("on", "Conectado");
     renderAll();
+    if(typeof maybeRunFix==="function") maybeRunFix();
   },
   err => { setStatus("off", "Sin conexión (" + err.code + ")"); }
 );
@@ -669,8 +670,10 @@ onSnapshot(collection(db, "cobros"),
 onSnapshot(collection(db, "vales"),
   snap => {
     vales = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    valesLoaded = true;
     renderWashersDash();
     if (document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+    if(typeof maybeRunFix==="function") maybeRunFix();
   },
   () => {}
 );
@@ -1440,6 +1443,55 @@ function prepareChartsForPrint(){document.querySelectorAll('[_echarts_instance_]
 function cleanUpAfterPrint(){document.querySelectorAll('[_echarts_instance_]').forEach(el=>{const img=el.querySelector('.print-chart-img');if(!img)return;img.remove();el.style.position=el.dataset.pp||'';});}
 window.addEventListener('beforeprint',()=>{document.querySelectorAll('.view').forEach(v=>v.style.display='block');prepareChartsForPrint();});
 window.addEventListener('afterprint',()=>{document.querySelectorAll('.view').forEach(v=>{v.style.display=v.classList.contains('active')?'block':'';});cleanUpAfterPrint();});
+
+/* ================= AJUSTE ÚNICO DE NÚMEROS (migración automática, corre 1 sola vez) =================
+   Deja los números acomodados en Firebase:
+   1) Efectivo (cash) de los días del reporte de Wix (Aug 3-7).
+   2) Todos los gastos sin método -> efectivo (se restan de la caja).
+   3) Todos los vales -> origen efectivo (salen de la caja, no de la tarjeta).
+   Queda una bandera en config/fixApplied para NO repetir. No toca deudas, ventas ni cuenta virtual. */
+let fixFlagLoaded=false, fixApplied=false, fixRunning=false, valesLoaded=false;
+const FIX_CASH_WIX = {
+  "2026-08-03": 319000,
+  "2026-08-04": 405000,
+  "2026-08-05": 120000,
+  "2026-08-06": 595000,
+  "2026-08-07": 155000
+};
+onSnapshot(doc(db,"config","fixApplied2"),
+  snap => { fixFlagLoaded=true; fixApplied=!!(snap.exists() && snap.data().done); maybeRunFix(); },
+  () => { fixFlagLoaded=true; }
+);
+async function maybeRunFix(){
+  if(fixApplied || fixRunning || !fixFlagLoaded) return;
+  if(!days.length || !valesLoaded) return;   // esperamos a que carguen días y vales
+  fixRunning=true;
+  try{
+    // 1) efectivo de los días de Wix
+    for(const [date,cash] of Object.entries(FIX_CASH_WIX)){
+      const d=days.find(x=>x.date===date);
+      if(d && num(d.cash)!==cash){ await setDoc(doc(db,COL_DAYS,date),{cash,updatedAt:Date.now()},{merge:true}); }
+    }
+    // Identificamos el gasto más grande: ese salió de TARJETA (no de la caja).
+    const withExp=days.filter(d=>num(d.expense)>0).sort((a,b)=>num(b.expense)-num(a.expense));
+    const bigDate=withExp.length?withExp[0].date:null;
+    // 2) gastos sin método -> efectivo, EXCEPTO el gasto más grande que va a tarjeta
+    for(const d of days){
+      const g=num(d.expense);
+      if(g<=0) continue;
+      if(d.date===bigDate){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"tarjeta",expCard:g,expCash:0,updatedAt:Date.now()},{merge:true}); }
+      else if(!d.expMethod){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"efectivo",expCash:g,expCard:0,updatedAt:Date.now()},{merge:true}); }
+    }
+    // 3) vales -> origen efectivo
+    for(const v of vales){
+      if(v.source!=="efectivo"){ await setDoc(doc(db,"vales",v.id),{source:"efectivo",updatedAt:Date.now()},{merge:true}); }
+    }
+    await setDoc(doc(db,"config","fixApplied2"),{done:true,at:new Date().toISOString()},{merge:true});
+    fixApplied=true;
+    console.log("Ajuste único aplicado: efectivo Wix + gasto grande a tarjeta + resto de gastos a efectivo + vales a efectivo.");
+  }catch(err){ console.warn("No se pudo aplicar el ajuste único:",err.message); }
+  finally{ fixRunning=false; }
+}
 
 /* ---------- init ---------- */
 initWashers();
