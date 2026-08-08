@@ -76,7 +76,6 @@ label.field{display:flex;flex-direction:column;gap:5px;font-size:.8rem;color:var
 input,select{font:inherit;font-size:.9rem;padding:9px 11px;border:1px solid var(--artifact-border);border-radius:9px;background:var(--artifact-background);color:var(--artifact-text)}
 input:focus,select:focus{outline:none;border-color:var(--artifact-accent)}
 label.field.debt input{border-color:var(--artifact-red)}
-/* --- lavadores en el formulario --- */
 .washers-block{margin-top:16px;border-top:1px dashed var(--artifact-border);padding-top:14px}
 .wash-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:.8rem;font-weight:700;color:var(--artifact-text-soft);text-transform:uppercase;letter-spacing:.04em}
 .wash-check{font-size:.8rem;font-weight:600;text-transform:none;letter-spacing:0;color:var(--artifact-text-soft)}
@@ -225,6 +224,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <button class="btn" onclick="openCargar()">＋ Cargar deuda</button>
     <button class="btn bell" id="btnNotas" onclick="openNotas()"><span class="bell-ico">🔔</span> Pendientes<span class="dot" id="notasDot" style="display:none">0</span></button>
     <button class="btn" onclick="exportExcel()">Exportar Excel</button>
+    <button class="btn" onclick="exportUltimos4()">Reporte últimos 4 días</button>
   </div>
 </header>
 
@@ -307,8 +307,8 @@ tr.has-debt{background:var(--artifact-red-soft)}
   <section class="view" id="resumen">
     <div class="kpis">
       <div class="kpi accent"><div class="lbl">Total generado</div><div class="val" id="kTotal">$0</div><div class="sub">lavados + parqueadero</div></div>
-      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pend. + cobros efectivo − gastos efectivo</div></div>
-      <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">virtual + cobros tarjeta − gastos tarjeta</div></div>
+      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pend. + cobros efectivo − gastos efectivo − vales efectivo</div></div>
+      <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">virtual + cobros tarjeta − gastos tarjeta − vales virtual</div></div>
       <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
       <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
       <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
@@ -321,6 +321,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <div class="kpi"><div class="lbl">Total sin deuda</div><div class="val" id="kNoDebt">$0</div><div class="sub">plata que tenemos hoy</div></div>
       <div class="kpi green"><div class="lbl">Total con deuda</div><div class="val" id="kWithDebt">$0</div><div class="sub">si pagan todo</div></div>
       <div class="kpi red"><div class="lbl">Nos falta (por cobrar)</div><div class="val" id="kDebt">$0</div><div class="sub">deudas no pagadas</div></div>
+      <div class="kpi green"><div class="lbl">Efectivo físico ahora</div><div class="val" id="kCashNow">$0</div><div class="sub">lo que hay en caja hoy (efectivo real − deudas por cobrar)</div></div>
     </div>
 
     <div class="grid-2">
@@ -370,7 +371,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <p class="section-sub" style="margin:0 0 12px">Cada vale se le RESTA al lavador de lo que hay que pagarle al cierre. Cuando marcas "Ya pagué a los lavadores", los vales pendientes quedan como descontados.</p>
       <div class="table-wrap" style="max-height:340px">
         <table>
-          <thead><tr><th>Fecha</th><th>Lavador</th><th class="num">Valor</th><th>Nota</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Lavador</th><th class="num">Valor</th><th>Origen</th><th>Nota</th><th>Estado</th></tr></thead>
           <tbody id="valesBody"></tbody>
         </table>
       </div>
@@ -472,6 +473,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <label class="field">Lavador<select id="vWasher" required></select></label>
       <label class="field">Valor del vale<input type="text" inputmode="numeric" id="vValue" placeholder="0" required autocomplete="off"></label>
       <label class="field">Fecha<input type="date" id="vDate" required></label>
+      <label class="field">¿De dónde salió la plata?<select id="vSource"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta (virtual)</option></select></label>
       <label class="field">Nota (opcional)<input id="vNote" placeholder="Motivo..." autocomplete="off"></label>
       <div class="row">
         <button type="button" class="btn ghost" onclick="closeVale()">Cancelar</button>
@@ -533,8 +535,8 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
-const COL_DAYS = "cierres";          // 1 documento por día, id = fecha (YYYY-MM-DD)
-const MAX_W = 5;                     // máximo de lavadores por día
+const COL_DAYS = "cierres";
+const MAX_W = 5;
 
 function setStatus(state, msg){
   const el = document.getElementById("cloudStatus");
@@ -546,53 +548,47 @@ function setStatus(state, msg){
 /* ================= STATE ================= */
 const COP = new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
 const fmt = n => COP.format(Math.round(n||0));
-const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleString('es-CO') : ''; };   // 1200000 -> "1.200.000"
-const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
+const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleString('es-CO') : ''; };
+const numVal = el => +(''+el.value).replace(/\D/g,'')||0;
 const digits = v => +(''+v).replace(/\D/g,'')||0;
 function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
 ['fCash','fVirtual','fExpense','fExpCash','fExpCard','fDebt','fDebtNetValue','fMktValue','pValue','cValue','vValue','eCash','eCard','lValue'].forEach(attachSep);
-let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,debt,debtWho,washers:[{name,amount}],commPct,closed}
+let days = [];
 let commPct = 35;
-let loadedFromExisting = null;   // fecha cargada en el form para editar (evita duplicar cierres)
-let roster = ['Lavador 1','Lavador 2','Lavador 3'];  // lista fija de lavadores (persistida)
-let pagos = [];                                        // registros de pago a lavadores
-let cobros = [];                                       // registros de cobro de deudas
-let vales = [];                                        // adelantos (vales) entregados a lavadores
-let notas = [];                                        // notas de administradores (revisión fin de mes)
+let loadedFromExisting = null;
+let roster = ['Lavador 1','Lavador 2','Lavador 3'];
+let pagos = [];
+let cobros = [];
+let vales = [];
+let notas = [];
 let charts = {};
 
 /* ---------- per-day math ---------- */
-const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;  // cualquier valor (texto o número) -> número
+const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;
 const wash  = d => num(d.cash)+num(d.virtual);
 const park  = d => num(d.park);
 const total = d => wash(d)+park(d);
-const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;  // lavadores
-const biz   = d => total(d)-comm(d);                                               // negocio
-const net   = d => biz(d)-num(d.expense);                                          // utilidad neta
-const debt  = d => num(d.debt);                                                    // deuda original registrada
-const mktVal = d => d.mkt ? num(d.mktValue) : 0;                                    // ingreso atribuido a marketing ese día
-/* --- gastos por método (para descontar de la caja/cuenta correcta). Gasto antiguo sin método -> pendiente, no se descuenta hasta asignarlo. */
+const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;
+const biz   = d => total(d)-comm(d);
+const net   = d => biz(d)-num(d.expense);
+const debt  = d => num(d.debt);
+const mktVal = d => d.mkt ? num(d.mktValue) : 0;
 const expCashOf = d => { const m=d.expMethod, e=num(d.expense); if(m==='efectivo')return e; if(m==='tarjeta')return 0; if(m==='combinado')return num(d.expCash); return 0; };
 const expCardOf = d => { const m=d.expMethod, e=num(d.expense); if(m==='tarjeta')return e; if(m==='combinado')return num(d.expCard); return 0; };
 const expUnknown = d => num(d.expense)>0 && !d.expMethod;
-/* --- dos buckets de deuda por dia --- 
-   Compartida (35/65): debt/debtWho/debtPaid.  Neta 100% negocio: debtNet/debtNetWho/debtNetReason/debtNetPaid.
-   Legacy: dias con debtShared===false guardaban su valor en debt/debtPaid -> se leen como deuda neta. */
 const shTot   = d => (d.debtShared===false)? 0 : num(d.debt);
 const shPaid  = d => (d.debtShared===false)? 0 : num(d.debtPaid);
 const ntTot   = d => (d.debtShared===false)? num(d.debt) : num(d.debtNet);
 const ntPaid  = d => (d.debtShared===false)? num(d.debtPaid) : num(d.debtNetPaid);
-const sharedOut = d => Math.max(0, shTot(d)-shPaid(d));                             // deuda compartida pendiente
-const netOut    = d => Math.max(0, ntTot(d)-ntPaid(d));                             // deuda 100% negocio pendiente
-const debtOut = d => sharedOut(d)+netOut(d);                                        // deuda total pendiente
+const sharedOut = d => Math.max(0, shTot(d)-shPaid(d));
+const netOut    = d => Math.max(0, ntTot(d)-ntPaid(d));
+const debtOut = d => sharedOut(d)+netOut(d);
 const ntWho   = d => (d.debtShared===false)? (d.debtWho||'') : (d.debtNetWho||'');
 const ntReason= d => (d.debtShared===false)? (d.debtReason||'') : (d.debtNetReason||'');
-/* un cobro pertenece al bucket neto? (legacy: por el tipo del dia) */
 function cobroIsNet(c){ if(c.bucket) return c.bucket==='net'; const d=days.find(x=>x.date===c.dayDate); return !!(d && d.debtShared===false); }
-/* suma de cobros de deudas 100% negocio ya cobradas: son ganancia neta */
 function collectedNonShared(){ return cobros.reduce((a,c)=>a+(cobroIsNet(c)?num(c.amount):0),0); }
-const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
-const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
+const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;
+const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));
 
 /* ---------- Firestore writes ---------- */
 async function closeDay(d){
@@ -629,7 +625,6 @@ onSnapshot(doc(db, "config", "general"),
   snap => {
     if (snap.exists()){
       const saved = +snap.data().commPct;
-      // El default siempre es 35%. Un 0/valor invalido guardado no debe pisar el default.
       commPct = (Number.isFinite(saved) && saved > 0) ? saved : 35;
       commInput.value = commPct;
       refreshPctLabels();
@@ -638,17 +633,15 @@ onSnapshot(doc(db, "config", "general"),
   },
   () => {}
 );
-/* lista fija de lavadores */
 onSnapshot(doc(db, "config", "lavadores"),
   snap => {
     if (snap.exists() && Array.isArray(snap.data().names) && snap.data().names.length){
       roster = snap.data().names.slice(0, MAX_W);
-      if (isFreshForm()) initWashers();   // si el formulario está en blanco, recarga los nombres fijos
+      if (isFreshForm()) initWashers();
     }
   },
   () => {}
 );
-/* registros de pago a lavadores */
 onSnapshot(collection(db, "pagos"),
   snap => {
     pagos = snap.docs.map(x => ({ id:x.id, ...x.data() }));
@@ -657,12 +650,10 @@ onSnapshot(collection(db, "pagos"),
   },
   () => {}
 );
-/* registros de cobro de deudas */
 onSnapshot(collection(db, "cobros"),
   snap => { cobros = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderAll(); },
   () => {}
 );
-/* registros de vales (adelantos a lavadores) */
 onSnapshot(collection(db, "vales"),
   snap => {
     vales = snap.docs.map(x => ({ id:x.id, ...x.data() }));
@@ -671,7 +662,6 @@ onSnapshot(collection(db, "vales"),
   },
   () => {}
 );
-/* notas de administradores */
 onSnapshot(collection(db, "notas"),
   snap => { notas = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderNotasBadge(); if(document.getElementById('notasModal').classList.contains('open')) renderNotas(); },
   () => {}
@@ -712,12 +702,10 @@ function bindWasherRow(row){
   row.querySelector('.w-name').addEventListener('change', syncRosterFromForm);
   row.querySelector('.w-del').onclick=()=>{ if(washerRows().length<=1){ alert('Debe quedar al menos un lavador.'); return; } row.remove(); updateWashCheck(); syncRosterFromForm(); };
 }
-/* Guarda en Firebase la lista fija de lavadores (nombres actuales del formulario). */
 function syncRosterFromForm(){
   const names=washerRows().map(r=>r.querySelector('.w-name').value.trim()).filter(Boolean);
   if(names.length){ roster=names.slice(0,MAX_W); saveRoster(); }
 }
-/* True si el formulario está en blanco y la fecha no tiene registro (para recargar nombres fijos). */
 function isFreshForm(){
   const ex=days.find(d=>d.date===fDate.value);
   if(ex) return false;
@@ -750,10 +738,9 @@ function updateWashCheck(){
 document.getElementById('addWasher').onclick=()=>{ addWasherRow(); syncRosterFromForm(); };
 ['fCash','fVirtual'].forEach(id=>document.getElementById(id).addEventListener('input',updateWashCheck));
 
-/* ---------- marketing: mostrar/ocultar el valor según el checkbox ---------- */
+/* ---------- marketing ---------- */
 function toggleMkt(){ document.getElementById('fMktWrap').classList.toggle('show', document.getElementById('fMkt').checked); }
 document.getElementById('fMkt').addEventListener('change',toggleMkt);
-/* ---------- deuda 100% negocio: mostrar campos motivo/valor/quien cuando esta marcada ---------- */
 function toggleDebtNet(){ const on=document.getElementById('fDebtNet').checked; ['fDebtNetReasonWrap','fDebtNetValueWrap','fDebtNetWhoWrap'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=on?'flex':'none';}); }
 document.getElementById('fDebtNet').addEventListener('change',toggleDebtNet);
 function toggleExpMethod(){ const comb=document.getElementById('fExpMethod').value==='combinado'; document.getElementById('fExpCashWrap').style.display=comb?'flex':'none'; document.getElementById('fExpCardWrap').style.display=comb?'flex':'none'; }
@@ -761,12 +748,10 @@ document.getElementById('fExpMethod').addEventListener('change',toggleExpMethod)
 
 /* ---------- form cierre ---------- */
 document.getElementById('fDate').valueAsDate=new Date();
-/* Si el día seleccionado quedó en validación (con deuda), precargamos sus datos para poder cerrarlo. */
 document.getElementById('fDate').addEventListener('change',()=>{
   const ex=days.find(d=>d.date===fDate.value);
   loadedFromExisting=null;
   if(ex){
-    // Día ya registrado: precargamos todo para VER lo que se guardó (el cierre no se puede repetir).
     fCash.value=sep(ex.cash||0); fVirtual.value=sep(ex.virtual||0);
     fExpense.value=sep(ex.expense||0); fNote.value=ex.note||'';
     document.getElementById('fExpMethod').value=ex.expMethod||''; fExpCash.value=ex.expCash?sep(ex.expCash):''; fExpCard.value=ex.expCard?sep(ex.expCard):''; toggleExpMethod();
@@ -778,14 +763,13 @@ document.getElementById('fDate').addEventListener('change',()=>{
     document.getElementById('fMkt').checked=!!ex.mkt; fMktValue.value=ex.mktValue?sep(ex.mktValue):''; toggleMkt();
     initWashers(ex.washers);
     updateWashCheck();
-    loadedFromExisting=fDate.value;   // marcamos que este día se cargó para editar (no es duplicado)
+    loadedFromExisting=fDate.value;
   }
 });
 document.getElementById('entryForm').onsubmit=async e=>{
   e.preventDefault();
   if(!fDate.value){ alert('Selecciona una fecha.'); return; }
   const ex = days.find(d=>d.date===fDate.value);
-  // Un día se cierra UNA sola vez: si ya existe un cierre para esa fecha, no se puede volver a cerrar ni modificar.
   if(ex && ex.closed){
     alert('El día '+fDate.value+' ya tiene un cierre registrado.\n\nUn día solo se cierra UNA vez: no se puede volver a cerrar ni modificar. Estás viendo la información que quedó guardada ese día.\n\nSi necesitas hacer algún cambio, habla con el administrador y creador de este software: José Luis Rodríguez.');
     return;
@@ -819,7 +803,7 @@ document.getElementById('entryForm').onsubmit=async e=>{
     washers, commPct:commPct};
   try{
     await closeDay(rec);
-    syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
+    syncRosterFromForm();
     fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
     document.getElementById('fExpMethod').value=''; fExpCash.value=''; fExpCard.value=''; toggleExpMethod();
     document.getElementById('fDebtNet').checked=false; fDebtNetValue.value=''; fDebtNetReason.value=''; fDebtNetWho.value=''; toggleDebtNet();
@@ -844,7 +828,7 @@ document.getElementById('parkForm').onsubmit=async e=>{
   }catch(err){ alert('No se pudo guardar el parqueadero: '+err.message); }
 };
 
-/* ---------- modal ASIGNAR LAVADORES (para días ya cerrados sin desglose) ---------- */
+/* ---------- modal ASIGNAR LAVADORES ---------- */
 let assignDate=null;
 const assignList=document.getElementById('assignWashersList');
 function assignRows(){ return [...assignList.querySelectorAll('.wash-row')]; }
@@ -891,7 +875,7 @@ document.getElementById('assignForm').onsubmit=async e=>{
   }
   try{
     await setDoc(doc(db,COL_DAYS,d.date),{washers,updatedAt:Date.now()},{merge:true});
-    closeAssign();   // al guardar, el letrero desaparece y el día queda bloqueado
+    closeAssign();
   }catch(err){ alert('No se pudo guardar: '+err.message); }
 };
 window.assignWashers=assignWashers;
@@ -950,7 +934,7 @@ document.getElementById('cobroForm').onsubmit=async e=>{
 };
 window.openCobro=openCobro; window.closeCobro=closeCobro;
 
-/* ---------- CARGAR DEUDA (agregar una deuda a un día) ---------- */
+/* ---------- CARGAR DEUDA ---------- */
 function joinWho(a,b){ return [a,b].map(x=>(x||'').trim()).filter(Boolean).join(', '); }
 function openCargar(){
   const list=[...days].sort((a,b)=>b.date.localeCompare(a.date));
@@ -986,7 +970,6 @@ document.getElementById('cargarForm').onsubmit=async e=>{
   const val=numVal(lValue); if(val<=0){ alert('Ingresa el valor de la deuda.'); return; }
   const bucket=document.getElementById('lType').value==='net'?'net':'shared';
   const who=lWho.value.trim(), reason=lReason.value.trim();
-  // Normalizamos el día (arregla días legacy) y sumamos al bucket elegido, respetando lo ya cobrado.
   const curShTot=shTot(d), curShPaid=shPaid(d), curShWho=(d.debtShared===false)?'':(d.debtWho||'');
   const curNtTot=ntTot(d), curNtPaid=ntPaid(d), curNtWho=ntWho(d), curNtReason=ntReason(d);
   const payload={
@@ -1008,7 +991,7 @@ document.getElementById('cargarForm').onsubmit=async e=>{
 };
 window.openCargar=openCargar; window.closeCargar=closeCargar;
 
-/* ---------- gastos: método de pago (efectivo/tarjeta/combinado) ---------- */
+/* ---------- gastos: método de pago ---------- */
 function expenseCellHTML(d){
   const e=num(d.expense); if(e<=0) return fmt(0);
   if(expUnknown(d)) return fmt(e)+'<button type="button" class="mini-btn" onclick="openExpMethod(\''+d.date+'\')">¿tarjeta o efectivo?</button>';
@@ -1040,7 +1023,7 @@ document.getElementById('expForm').onsubmit=async e=>{
 };
 window.openExpMethod=openExpMethod; window.closeExpMethod=closeExpMethod;
 
-/* ---------- vales (adelantos a lavadores) ---------- */
+/* ---------- vales ---------- */
 function washerOptions(){
   const set=new Set(roster.map(n=>(n||'').trim()).filter(Boolean));
   days.forEach(d=>{ if(Array.isArray(d.washers)) d.washers.forEach(w=>{ const n=(w.name||'').trim(); if(n) set.add(n); }); });
@@ -1050,7 +1033,7 @@ function openVale(){
   const sel=document.getElementById('vWasher');
   sel.innerHTML=washerOptions().map(n=>`<option value="${n}">${n}</option>`).join('');
   document.getElementById('vDate').valueAsDate=new Date();
-  vValue.value=''; vNote.value='';
+  vValue.value=''; vNote.value=''; document.getElementById('vSource').value='efectivo';
   document.getElementById('valeModal').classList.add('open');
 }
 function closeVale(){ document.getElementById('valeModal').classList.remove('open'); }
@@ -1062,13 +1045,14 @@ document.getElementById('valeForm').onsubmit=async e=>{
   if(!washer){ alert('Selecciona un lavador.'); return; }
   if(val<=0){ alert('Ingresa el valor del vale.'); return; }
   try{
-    await addDoc(collection(db,'vales'),{washer,amount:val,note:vNote.value.trim(),valeAt:vDate.value||new Date().toISOString().slice(0,10),paid:false,valePaidAt:'',createdAt:Date.now()});
+    const source=(document.getElementById('vSource').value==='virtual')?'virtual':'efectivo';
+    await addDoc(collection(db,'vales'),{washer,amount:val,note:vNote.value.trim(),source:source,valeAt:vDate.value||new Date().toISOString().slice(0,10),paid:false,valePaidAt:'',createdAt:Date.now()});
     closeVale();
   }catch(err){ alert('No se pudo guardar el vale: '+err.message); }
 };
 window.openVale=openVale; window.closeVale=closeVale;
 
-/* ================= NOTAS (administradores) ================= */
+/* ================= NOTAS ================= */
 function unseenNotas(){ return notas.filter(n=>!n.seen).length; }
 function renderNotasBadge(){
   const dot=document.getElementById('notasDot'), btn=document.getElementById('btnNotas');
@@ -1153,24 +1137,24 @@ function renderKpis(){
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), EX=days.reduce((a,d)=>a+(d.expense||0),0),
         NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
-  // deudas cobradas, separadas por método (efectivo va a caja, tarjeta va a virtual). Cobros antiguos sin método -> efectivo.
   const colCash=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
   const colCard=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
-  const ND=collectedNonShared();  // deudas NO compartidas ya cobradas = ganancia neta 100% del negocio
-  const expC=days.reduce((a,d)=>a+expCashOf(d),0), expV=days.reduce((a,d)=>a+expCardOf(d),0);  // gastos ya descontados por método
-  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(C+colCash+DBT-expC); kVirtual.textContent=fmt(V+colCard-expV);
+  const ND=collectedNonShared();
+  const expC=days.reduce((a,d)=>a+expCashOf(d),0), expV=days.reduce((a,d)=>a+expCardOf(d),0);
+  const valeCash=vales.reduce((a,v)=>a+((v.source==='virtual')?0:num(v.amount)),0);
+  const valeCard=vales.reduce((a,v)=>a+((v.source==='virtual')?num(v.amount):0),0);
+  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(C+colCash+DBT-expC-valeCash); kVirtual.textContent=fmt(V+colCard-expV-valeCard);
   kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT+ND);
   kNoDebt.textContent=fmt(T+ND); kWithDebt.textContent=fmt(T+ND+DBT); kDebt.textContent=fmt(DBT);
+  const cashNow=C+colCash-expC-valeCash; const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(cashNow);
   const MK=days.reduce((a,d)=>a+mktVal(d),0); const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(MK);
 }
 
-/* ---------- lavadores: consolidado por lavador (pendiente + ya pagado) ----------
-   Recorre TODOS los días. Cada lavador que aparezca en algún día (o en la lista fija)
-   se muestra siempre, con su producción, su pendiente por pagar y lo ya pagado. */
+/* ---------- lavadores: consolidado por lavador ---------- */
 function aggWashers(){
   const map={}; let uProdPend=0,uPayPend=0,uProdPaid=0,uPayPaid=0,paidTotal=0,paidMonth=0;
   const cm=currentMonth();
-  const groups={};   // historial de pagos derivado de los días realmente pagados (clave = fecha de pago)
+  const groups={};
   const bump=k=>{ if(!map[k]) map[k]={produced:0,payTotal:0,payPending:0,payPaid:0,valePending:0,valePaid:0}; return map[k]; };
   days.forEach(d=>{
     const pct=(num(d.commPct)||commPct)/100;
@@ -1195,8 +1179,7 @@ function aggWashers(){
       groups[gk].count+=1; groups[gk].total+=dayPay;
     }
   });
-  roster.forEach(n=>{ const k=(n||'').trim(); if(k) bump(k); });   // que todos los lavadores fijos aparezcan siempre
-  // vales (adelantos): pendientes se restan de lo por pagar; ya descontados quedan como histórico
+  roster.forEach(n=>{ const k=(n||'').trim(); if(k) bump(k); });
   let valePendAll=0, valePaidAll=0;
   vales.forEach(v=>{
     const k=(v.washer||'').trim()||'Sin nombre';
@@ -1208,7 +1191,6 @@ function aggWashers(){
   const payHist=Object.values(groups).sort((a,b)=>(b.paidAt||'').localeCompare(a.paidAt||''));
   return {map,arr,uProdPend,uPayPend,uProdPaid,uPayPaid,paidTotal,paidMonth,payHist,valePendAll,valePaidAll};
 }
-/* ---------- "Ya pagué a los lavadores": pone el pendiente en cero (sin tocar ganancias) y registra el pago ---------- */
 async function payWashers(){
   const w=aggWashers();
   const list=days.filter(d=>!d.washPaid && (Array.isArray(d.washers)&&d.washers.length ? d.washers.some(x=>num(x.amount)>0) : wash(d)>0));
@@ -1226,19 +1208,16 @@ async function payWashers(){
   }catch(err){ alert('No se pudo registrar el pago: '+err.message); }
 }
 window.payWashers=payWashers;
-/* ---------- Contraseña para acciones sensibles ---------- */
 function requirePass(){
   const p = prompt('Esta acción está protegida.\n\nEscribe la contraseña para continuar:');
-  if(p===null) return false;               // canceló
+  if(p===null) return false;
   if(p.trim()!=='SIMON123'){ alert('Contraseña incorrecta. Acción cancelada.'); return false; }
   return true;
 }
-/* ---------- Deshacer último pago: devuelve los días del último pago a "por pagar" ---------- */
 async function undoPay(){
   const paid=days.filter(d=>!!d.washPaid);
   if(!paid.length){ alert('No hay pagos que deshacer.'); return; }
   if(!requirePass()) return;
-  // agrupar por fecha de pago y tomar el más reciente
   const groups={};
   paid.forEach(d=>{ const k=d.washPaidAt||'anterior'; (groups[k]=groups[k]||[]).push(d); });
   const lastKey=Object.keys(groups).sort((a,b)=>b.localeCompare(a))[0];
@@ -1257,7 +1236,6 @@ async function undoPay(){
   }catch(err){ alert('No se pudo deshacer el pago: '+err.message); }
 }
 window.undoPay=undoPay;
-/* ---------- Resetear pagos: devuelve TODO lo ya pagado a "por pagar" y vacía el historial ---------- */
 async function resetPay(){
   const paid=days.filter(d=>!!d.washPaid);
   if(!paid.length){ alert('No hay pagos registrados para resetear.'); return; }
@@ -1308,9 +1286,10 @@ function renderWashersDash(){
   if(vb) vb.innerHTML = vs.length? vs.map(v=>`<tr>
     <td>${v.valeAt||''}</td><td>${v.washer||''}</td>
     <td class="num neg">${fmt(num(v.amount))}</td>
+    <td>${v.source==='virtual'?'tarjeta/virtual':'efectivo'}</td>
     <td>${v.note||''}</td>
     <td>${v.paid?'<span class="badge-lock">descontado</span>':'<span class="badge-val">pendiente</span>'}</td></tr>`).join('')
-    : `<tr><td colspan="5" class="empty">Aún no has dado vales (adelantos).</td></tr>`;
+    : `<tr><td colspan="6" class="empty">Aún no has dado vales (adelantos).</td></tr>`;
 }
 
 /* ---------- charts ---------- */
@@ -1380,12 +1359,43 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(prows.length?prows:[{['Fecha de pago']:'','Días':'','Total pagado':'','Detalle':''}]),'Pagos');
   const crows=[...cobros].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(c=>({['Día de la deuda']:c.dayDate||'','Fecha de cobro':c.paidAt||'','Valor cobrado':c.amount||0,'Quién pagó':c.who||'','Cómo pagó':(c.method==='tarjeta')?'Tarjeta/cuenta':'Efectivo'}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crows.length?crows:[{['Día de la deuda']:'','Fecha de cobro':'','Valor cobrado':'','Quién pagó':'','Cómo pagó':''}]),'Cobros');
-  const vrows=[...vales].sort((a,b)=>(a.valeAt||'').localeCompare(b.valeAt||'')).map(v=>({Fecha:v.valeAt||'',Lavador:v.washer||'',Valor:num(v.amount),Nota:v.note||'',Estado:v.paid?'descontado':'pendiente'}));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(vrows.length?vrows:[{Fecha:'',Lavador:'',Valor:'',Nota:'',Estado:''}]),'Vales');
+  const vrows=[...vales].sort((a,b)=>(a.valeAt||'').localeCompare(b.valeAt||'')).map(v=>({Fecha:v.valeAt||'',Lavador:v.washer||'',Valor:num(v.amount),Origen:v.source==='virtual'?'tarjeta/virtual':'efectivo',Nota:v.note||'',Estado:v.paid?'descontado':'pendiente'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(vrows.length?vrows:[{Fecha:'',Lavador:'',Valor:'',Origen:'',Nota:'',Estado:''}]),'Vales');
   const nrows=[...notas].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(n=>({Fecha:n.at||'',Autor:n.autor||'',Nota:n.text||'',Estado:n.seen?'vista':'nueva'}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(nrows.length?nrows:[{Fecha:'',Autor:'',Nota:'',Estado:''}]),'Notas');
   XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
+function exportUltimos4(){
+  const last4=[...days].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
+  if(!last4.length){ alert('Aún no hay días registrados para hacer el reporte.'); return; }
+  const wb=XLSX.utils.book_new();
+  const rows=last4.map(d=>({
+    Fecha:d.date,
+    Efectivo:num(d.cash),
+    'En cuenta':num(d.virtual),
+    Parqueadero:park(d),
+    'Total del día':total(d),
+    ['Lavadores ('+(d.commPct??commPct)+'%)']:Math.round(comm(d)),
+    'Negocio':Math.round(biz(d)),
+    Gastos:num(d.expense),
+    'Utilidad neta':Math.round(net(d)),
+    'Marketing':mktVal(d),
+    'Deuda pendiente':debtOut(d),
+    Estado: debtOut(d)>0 ? 'En validación (con deuda)' : (d.closed?'Cerrado':'—')
+  }));
+  const sum=k=>rows.reduce((a,r)=>a+(+r[k]||0),0);
+  const cKey='Lavadores ('+(last4[0].commPct??commPct)+'%)';
+  rows.push({Fecha:'TOTAL 4 DÍAS',Efectivo:sum('Efectivo'),'En cuenta':sum('En cuenta'),Parqueadero:sum('Parqueadero'),
+    'Total del día':sum('Total del día'),[cKey]:last4.reduce((a,d)=>a+Math.round(comm(d)),0),
+    'Negocio':last4.reduce((a,d)=>a+Math.round(biz(d)),0),Gastos:sum('Gastos'),
+    'Utilidad neta':last4.reduce((a,d)=>a+Math.round(net(d)),0),'Marketing':sum('Marketing'),
+    'Deuda pendiente':sum('Deuda pendiente'),Estado:''});
+  const ws=XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,ws,'Ventas 4 días');
+  const hasta=last4[0].date;
+  XLSX.writeFile(wb,'reporte_ventas_4dias_'+hasta+'.xlsx');
+}
+window.exportUltimos4=exportUltimos4;
 window.exportExcel=exportExcel;
 window.openPark=openPark;
 window.closePark=closePark;
