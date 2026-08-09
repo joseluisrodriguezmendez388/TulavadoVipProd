@@ -264,6 +264,9 @@ tr.has-debt{background:var(--artifact-red-soft)}
           <label class="field debt netd" id="fDebtNetReasonWrap" style="display:none">¿Cuál fue? (motivo)<input id="fDebtNetReason" placeholder="Parqueadero, venta..." autocomplete="off"></label>
           <label class="field debt netd" id="fDebtNetValueWrap" style="display:none">Valor (100% del negocio)<input type="text" inputmode="numeric" id="fDebtNetValue" placeholder="0" autocomplete="off"></label>
           <label class="field debt netd" id="fDebtNetWhoWrap" style="display:none">¿Quién debe / a quién se le cobra?<input id="fDebtNetWho" placeholder="Nombre..." autocomplete="off"></label>
+          <label class="field netd" id="fDebtNetMethodWrap" style="display:none">¿Cómo entró esta plata?<select id="fDebtNetMethod"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta (virtual)</option><option value="combinado">Combinado</option></select></label>
+          <label class="field netd" id="fDebtNetCashWrap" style="display:none">Entró en efectivo<input type="text" inputmode="numeric" id="fDebtNetCash" placeholder="0" autocomplete="off"></label>
+          <label class="field netd" id="fDebtNetCardWrap" style="display:none">Entró en tarjeta<input type="text" inputmode="numeric" id="fDebtNetCard" placeholder="0" autocomplete="off"></label>
           <label class="field"><span class="chk-row"><input type="checkbox" id="fMkt"> ¿Cliente agendado por marketing?</span></label>
           <label class="field mkt-wrap" id="fMktWrap">Valor por marketing<input type="text" inputmode="numeric" id="fMktValue" placeholder="0" autocomplete="off"></label>
         </div>
@@ -396,6 +399,9 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <label class="field">Fecha<input type="date" id="pDate" required></label>
       <label class="field">Valor<input type="text" inputmode="numeric" id="pValue" placeholder="0" required autocomplete="off"></label>
       <label class="field">% lavadores<input type="number" id="pPct" step="1" min="0" max="100" value="0"></label>
+      <label class="field">¿Cómo entró?<select id="pMethod"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta (virtual)</option><option value="combinado">Combinado</option></select></label>
+      <label class="field" id="pCashWrap" style="display:none">Valor en efectivo<input type="text" inputmode="numeric" id="pCash" placeholder="0" autocomplete="off"></label>
+      <label class="field" id="pCardWrap" style="display:none">Valor en tarjeta<input type="text" inputmode="numeric" id="pCard" placeholder="0" autocomplete="off"></label>
       <div class="row">
         <button type="button" class="btn ghost" onclick="closePark()">Cancelar</button>
         <button type="submit" class="btn primary">Guardar</button>
@@ -553,7 +559,7 @@ const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleStri
 const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
 const digits = v => +(''+v).replace(/\D/g,'')||0;
 function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
-['fCash','fVirtual','fExpense','fExpCash','fExpCard','fDebt','fDebtNetValue','fMktValue','pValue','cValue','vValue','eCash','eCard','lValue'].forEach(attachSep);
+['fCash','fVirtual','fExpense','fExpCash','fExpCard','fDebt','fDebtNetValue','fMktValue','pValue','cValue','vValue','eCash','eCard','lValue','pCash','pCard','fDebtNetCash','fDebtNetCard'].forEach(attachSep);
 let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,debt,debtWho,washers:[{name,amount}],commPct,closed}
 let commPct = 35;
 let loadedFromExisting = null;   // fecha cargada en el form para editar (evita duplicar cierres)
@@ -604,15 +610,19 @@ async function closeDay(d){
     expMethod:d.expMethod||'', expCash:d.expCash||0, expCard:d.expCard||0,
     note:d.note, debt:d.debt||0, debtWho:d.debtWho||'',
     debtShared:true, debtNet:d.debtNet||0, debtNetWho:d.debtNetWho||'', debtNetReason:d.debtNetReason||'',
+    debtNetMethod:d.debtNetMethod||'', debtNetCash:d.debtNetCash||0, debtNetCard:d.debtNetCard||0, debtNetPaid:d.debtNetPaid||0,
     mkt:!!d.mkt, mktValue:d.mktValue||0,
     washers:d.washers||[],
     commPct:d.commPct, closed:true, updatedAt:Date.now()
   }, { merge:true });
 }
-async function addPark(date, value, pct){
+async function addPark(date, value, pct, pCashAdd, pCardAdd){
   const ex = days.find(d=>d.date===date);
   await setDoc(doc(db, COL_DAYS, date), {
-    date, park:((ex&&ex.park)||0)+value, parkPct:pct, updatedAt:Date.now()
+    date, park:((ex&&ex.park)||0)+value, parkPct:pct,
+    parkCash:((ex&&num(ex.parkCash))||0)+(pCashAdd||0),
+    parkCard:((ex&&num(ex.parkCard))||0)+(pCardAdd||0),
+    updatedAt:Date.now()
   }, { merge:true });
 }
 async function saveCfg(){ await setDoc(doc(db, "config", "general"), {commPct}); }
@@ -760,9 +770,13 @@ document.getElementById('addWasher').onclick=()=>{ addWasherRow(); syncRosterFro
 function toggleMkt(){ document.getElementById('fMktWrap').classList.toggle('show', document.getElementById('fMkt').checked); }
 document.getElementById('fMkt').addEventListener('change',toggleMkt);
 /* ---------- deuda 100% negocio: mostrar campos motivo/valor/quien cuando esta marcada ---------- */
-function toggleDebtNet(){ const on=document.getElementById('fDebtNet').checked; ['fDebtNetReasonWrap','fDebtNetValueWrap','fDebtNetWhoWrap'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=on?'flex':'none';}); }
+function toggleDebtNet(){ const on=document.getElementById('fDebtNet').checked; ['fDebtNetReasonWrap','fDebtNetValueWrap','fDebtNetWhoWrap','fDebtNetMethodWrap'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=on?'flex':'none';}); toggleDebtNetMethod(); }
+function toggleDebtNetMethod(){ const on=document.getElementById('fDebtNet').checked; const comb=on && document.getElementById('fDebtNetMethod').value==='combinado'; document.getElementById('fDebtNetCashWrap').style.display=comb?'flex':'none'; document.getElementById('fDebtNetCardWrap').style.display=comb?'flex':'none'; }
 document.getElementById('fDebtNet').addEventListener('change',toggleDebtNet);
+document.getElementById('fDebtNetMethod').addEventListener('change',toggleDebtNetMethod);
 function toggleExpMethod(){ const comb=document.getElementById('fExpMethod').value==='combinado'; document.getElementById('fExpCashWrap').style.display=comb?'flex':'none'; document.getElementById('fExpCardWrap').style.display=comb?'flex':'none'; }
+function togglePark(){ const comb=document.getElementById('pMethod').value==='combinado'; document.getElementById('pCashWrap').style.display=comb?'flex':'none'; document.getElementById('pCardWrap').style.display=comb?'flex':'none'; }
+document.getElementById('pMethod').addEventListener('change',togglePark);
 document.getElementById('fExpMethod').addEventListener('change',toggleExpMethod);
 
 /* ---------- form cierre ---------- */
@@ -780,7 +794,8 @@ document.getElementById('fDate').addEventListener('change',()=>{
     fDebt.value=sep(legacyNet?0:(ex.debt||0)); fDebtWho.value=legacyNet?'':(ex.debtWho||'');
     const nAmt=legacyNet?num(ex.debt):num(ex.debtNet);
     document.getElementById('fDebtNet').checked=nAmt>0;
-    fDebtNetValue.value=nAmt?sep(nAmt):''; fDebtNetReason.value=ntReason(ex); fDebtNetWho.value=ntWho(ex); toggleDebtNet();
+    fDebtNetValue.value=nAmt?sep(nAmt):''; fDebtNetReason.value=ntReason(ex); fDebtNetWho.value=ntWho(ex);
+    document.getElementById('fDebtNetMethod').value=ex.debtNetMethod||'efectivo'; fDebtNetCash.value=ex.debtNetCash?sep(ex.debtNetCash):''; fDebtNetCard.value=ex.debtNetCard?sep(ex.debtNetCard):''; toggleDebtNet();
     document.getElementById('fMkt').checked=!!ex.mkt; fMktValue.value=ex.mktValue?sep(ex.mktValue):''; toggleMkt();
     initWashers(ex.washers);
     updateWashCheck();
@@ -806,7 +821,14 @@ document.getElementById('entryForm').onsubmit=async e=>{
   const mktOn=document.getElementById('fMkt').checked;
   if(mktOn && numVal(fMktValue)<=0){ alert('Marcaste que hubo cliente por marketing. Escribe el valor de marketing.'); return; }
   const netOn=document.getElementById('fDebtNet').checked;
-  if(netOn && numVal(fDebtNetValue)<=0){ alert('Marcaste que hay una deuda 100% del negocio. Escribe el valor de esa deuda.'); return; }
+  let netVal=0, netCash=0, netCard=0, netMethod='';
+  if(netOn){
+    netVal=numVal(fDebtNetValue);
+    if(netVal<=0){ alert('Marcaste que hay una deuda 100% del negocio. Escribe el valor de esa deuda.'); return; }
+    netMethod=document.getElementById('fDebtNetMethod').value;
+    if(netMethod==='efectivo'){ netCash=netVal; } else if(netMethod==='virtual'){ netCard=netVal; }
+    else { netCash=numVal(fDebtNetCash); netCard=numVal(fDebtNetCard); if(netCash+netCard!==netVal){ alert('El 100% negocio combinado no cuadra.\n\nEfectivo ('+fmt(netCash)+') + Tarjeta ('+fmt(netCard)+') debe ser igual al valor ('+fmt(netVal)+').'); return; } }
+  }
   const expTot=numVal(fExpense);
   const expM=document.getElementById('fExpMethod').value;
   let expCash=0, expCard=0;
@@ -820,7 +842,8 @@ document.getElementById('entryForm').onsubmit=async e=>{
     expense:numVal(fExpense),expMethod:expTot>0?expM:'',expCash:expCash,expCard:expCard,note:fNote.value.trim(),
     debt:numVal(fDebt),debtWho:fDebtWho.value.trim(),
     debtShared:true,
-    debtNet:netOn?numVal(fDebtNetValue):0, debtNetWho:netOn?fDebtNetWho.value.trim():'', debtNetReason:netOn?fDebtNetReason.value.trim():'',
+    debtNet:netVal, debtNetWho:netOn?fDebtNetWho.value.trim():'', debtNetReason:netOn?fDebtNetReason.value.trim():'',
+    debtNetMethod:netMethod, debtNetCash:netCash, debtNetCard:netCard, debtNetPaid:netVal,
     mkt:mktOn, mktValue:mktOn?numVal(fMktValue):0,
     washers, commPct:commPct};
   try{
@@ -828,7 +851,7 @@ document.getElementById('entryForm').onsubmit=async e=>{
     syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
     fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
     document.getElementById('fExpMethod').value=''; fExpCash.value=''; fExpCard.value=''; toggleExpMethod();
-    document.getElementById('fDebtNet').checked=false; fDebtNetValue.value=''; fDebtNetReason.value=''; fDebtNetWho.value=''; toggleDebtNet();
+    document.getElementById('fDebtNet').checked=false; fDebtNetValue.value=''; fDebtNetReason.value=''; fDebtNetWho.value=''; document.getElementById('fDebtNetMethod').value='efectivo'; fDebtNetCash.value=''; fDebtNetCard.value=''; toggleDebtNet();
     document.getElementById('fMkt').checked=false; fMktValue.value=''; toggleMkt();
     loadedFromExisting=null;
     initWashers();
@@ -844,9 +867,13 @@ document.getElementById('parkForm').onsubmit=async e=>{
   const date=pDate.value; if(!date){ alert('Selecciona una fecha.'); return; }
   const val=numVal(pValue);
   const pct=Math.min(100,Math.max(0,+pPct.value||0));
+  const pm=document.getElementById('pMethod').value;
+  let pC=0,pT=0;
+  if(pm==='efectivo'){ pC=val; } else if(pm==='virtual'){ pT=val; }
+  else { pC=numVal(pCash); pT=numVal(pCard); if(pC+pT!==val){ alert('El parqueadero combinado no cuadra.\n\nEfectivo ('+fmt(pC)+') + Tarjeta ('+fmt(pT)+') debe ser igual al valor ('+fmt(val)+').'); return; } }
   try{
-    await addPark(date, val, pct);
-    pValue.value=''; pPct.value='0'; closePark();
+    await addPark(date, val, pct, pC, pT);
+    pValue.value=''; pPct.value='0'; document.getElementById('pMethod').value='efectivo'; pCash.value=''; pCard.value=''; togglePark(); closePark();
   }catch(err){ alert('No se pudo guardar el parqueadero: '+err.message); }
 };
 
@@ -1021,14 +1048,16 @@ function expenseCellHTML(d){
   const m=d.expMethod;
   const tag = (m==='combinado') ? ('<span class="debt-who">ef '+fmt(num(d.expCash))+' · tj '+fmt(num(d.expCard))+'</span>')
             : ('<span class="debt-who">'+(m==='tarjeta'?'tarjeta':'efectivo')+'</span>');
-  return fmt(e)+tag;
+  // Boton para CAMBIAR el metodo en cualquier dia con gasto (asi el descuento a efectivo/tarjeta se corrige al instante).
+  return fmt(e)+tag+'<button type="button" class="mini-btn" onclick="openExpMethod(\''+d.date+'\')">editar</button>';
 }
 let expAssignDate=null;
 function openExpMethod(date){
   const d=days.find(x=>x.date===date); if(!d) return;
   expAssignDate=date;
-  document.getElementById('expInfo').textContent='Día '+date+' · gasto de '+fmt(num(d.expense))+'. Indica cómo se pagó para cuadrar la caja.';
-  eMethod.value='efectivo'; eCash.value=''; eCard.value=''; toggleExpModal();
+  document.getElementById('expInfo').textContent='Día '+date+' · gasto de '+fmt(num(d.expense))+'. Indica cómo se pagó para cuadrar la caja (efectivo resta de la caja, tarjeta resta de la cuenta).';
+  eMethod.value=(d.expMethod==='tarjeta'||d.expMethod==='combinado')?d.expMethod:'efectivo';
+  eCash.value=d.expCash?sep(d.expCash):''; eCard.value=d.expCard?sep(d.expCard):''; toggleExpModal();
   document.getElementById('expModal').classList.add('open');
 }
 function closeExpMethod(){ document.getElementById('expModal').classList.remove('open'); expAssignDate=null; }
@@ -1180,15 +1209,19 @@ function renderKpis(){
   // vales (adelantos): la plata sale de la caja/cuenta al ENTREGARLOS. Vale antiguo sin origen -> efectivo.
   const valeCash=vales.reduce((a,v)=>a+((v.source==='virtual')?0:num(v.amount)),0);
   const valeCard=vales.reduce((a,v)=>a+((v.source==='virtual')?num(v.amount):0),0);
+  // parqueadero por metodo (efectivo->caja, tarjeta->virtual)
+  const parkCash=days.reduce((a,d)=>a+num(d.parkCash),0), parkCard=days.reduce((a,d)=>a+num(d.parkCard),0);
+  // deuda 100% negocio recibida en el cierre (ya entro): suma a su caja + total + utilidad, sin comision
+  const netRecvCash=days.reduce((a,d)=>a+num(d.debtNetCash),0), netRecvCard=days.reduce((a,d)=>a+num(d.debtNetCard),0), netRecv=netRecvCash+netRecvCard;
   // MISMA IDEA para TODOS los numeros: se computan naturalmente desde efectivo real + cuenta real.
   // Cada movimiento (deuda/gasto/vale) afecta su propio lado (efectivo o virtual). El extraordinario no cuenta.
-  const cashReal   = C+colCash+DBT-expC-valeCash-AJUSTE_EFECTIVO;  // efectivo real (incluye deudas por cobrar como caja futura)
-  const virtualReal= V+colCard-expV-valeCard;                      // cuenta real (virtual), sin el gasto extraordinario
+  const cashReal   = C+colCash+DBT-expC-valeCash+parkCash+netRecvCash-AJUSTE_EFECTIVO;  // efectivo real (incluye deudas por cobrar + parqueadero/100% en efectivo)
+  const virtualReal= V+colCard-expV-valeCard+parkCard+netRecvCard;                      // cuenta real (virtual) + parqueadero/100% en tarjeta
   const cashNow    = cashReal-DBT;                                 // efectivo fisico hoy (sin lo que aun deben)
   // El gasto fijo (arriendo) AUN NO se paga: NO sale del efectivo ni de la cuenta, pero SI se cuenta
   // como costo -> resta la utilidad y aparece en Gastos. NT ya resta todo el expense (incluido el fijo).
-  const utilidad   = NT+ND-AJUSTE_EFECTIVO;
-  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(cashReal); kVirtual.textContent=fmt(virtualReal);
+  const utilidad   = NT+ND+netRecv-AJUSTE_EFECTIVO;
+  kTotal.textContent=fmt(T+ND+netRecv); kCash.textContent=fmt(cashReal); kVirtual.textContent=fmt(virtualReal);
   kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(gastosOper+extraExp); kNet.textContent=fmt(utilidad);
   // Total sin deuda = plata que tenemos HOY (efectivo fisico + cuenta). Total con deuda = cuando paguen todo.
   kNoDebt.textContent=fmt(cashNow+virtualReal); kWithDebt.textContent=fmt(cashReal+virtualReal); kDebt.textContent=fmt(DBT);
