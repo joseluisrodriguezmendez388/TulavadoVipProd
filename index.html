@@ -1,576 +1,3 @@
-
-
-
-Jose Luis (COL03) Mendez
-
-3
-
-
-pasame todod el codigo de index para cipiar y pegar y queuede acomodado los datos ahora en la app
-
-Aug 8, 3:32 PM
-
-
-Show reasoning
-Voy a actualizar la migración automática para que además marque el gasto más grande como tarjeta, y luego te paso el código. Primero reviso la migración actual.
-
-Show work
-El gasto grande salió de tarjeta, así que la migración debe marcarlo como tarjeta (no como efectivo). Actualizo la migración: excluye el gasto más grande del paso "a efectivo" y lo marca como tarjeta, y uso una bandera nueva para que se vuelva a aplicar aunque ya hubieras corrido la anterior.
-
-Show work
-Ahora valido la sintaxis del JavaScript.
-
-Show work
-¡Listo! El JavaScript quedó validado sin errores y el artefacto tu_lavado_vip.html ya está actualizado en el panel.
-
-Qué cambié en la migración automática
-Ahora, la primera vez que abras la app (aquí o en tu sitio), en cuanto conecte a Firebase deja todos los números acomodados solos:
-
-Efectivo de los días de Wix (Aug 3–7): 319.000 / 405.000 / 120.000 / 595.000 / 155.000.
-El gasto más grande (los $8.537.000) → tarjeta, para que se reste de la cuenta virtual y NO de la caja.
-El resto de gastos sin método → efectivo (se restan de la caja).
-Todos los vales → origen efectivo (incluido el de Efraín, que baja de la caja).
-Usé una bandera nueva (config/fixApplied2), así que aunque ya hubieras corrido la versión anterior, esta se aplica una vez más para corregir el gasto grande. Después queda marcada y no se repite.
-
-Cómo probarlo
-Abre el artefacto del panel. Cuando marque "Conectado", la migración corre sola. Refresca una vez (Ctrl+Shift+R) y revisa:
-
-Efectivo físico ahora → debería dar tus ~200 reales (ya no en millones negativos).
-En cuenta (real) → aquí sí baja el gasto grande de 8,5M.
-El código completo lo tienes en el panel de artefactos (botón de copiar) y para descargar:
-
-
-Un aviso honesto sobre la cuenta virtual: como ese gasto de 8,5M es enorme, al restarlo de la virtual esa cuenta puede quedar muy negativa (si en la cuenta del negocio no había esa plata, porque salió de otra bolsa/tarjeta personal). Si te queda rara, dime cómo la ves y lo tratamos como una inversión aparte para que tampoco descuadre la virtual. Corre la migración y me dices los dos números.
-
-
-Tu Lavado Vip
-Interactive
-
-
-
-
-se supone que ya si pongo ese index en git hub y actualizo me aparecen bien todos los datos ?
-
-Aug 8, 3:35 PM
-
-
-Show reasoning
-Sí, pero déjame ser 100% honesto para que no te lleves una sorpresa:
-
-Qué pasa cuando subas ese index a GitHub
-Subes el index.html, haces Commit changes (que diga "1 file changed"), esperas 1-2 min.
-Abres tu sitio con Ctrl + Shift + R.
-Al conectar a Firebase, la migración corre sola una vez, acomoda los datos (efectivo de Wix, gasto grande → tarjeta, gastos viejos → efectivo, vales → efectivo) y guarda la bandera fixApplied2 para no repetirse.
-Refresca una segunda vez (Ctrl+Shift+R). Ahí ya deberías ver todo acomodado.
-Importante: la migración escribe en Firebase, así que una vez corre, los datos quedan corregidos para siempre en la base — no solo en la pantalla. Eso es lo que quieres.
-
-El único punto que NO puedo garantizarte
-Yo no puedo ver tu Firebase desde aquí, así que armé la migración con los números que hablamos (los 5 días de Wix, el gasto más grande como el de 8,5M, todos los vales en efectivo). Si la realidad coincide con eso, todo queda perfecto. Pero pueden pasar dos cosas:
-
-El "Efectivo físico ahora" debería darte ~200. Si te da otro número, hay algún dato más que ajustar.
-La "Cuenta virtual" puede quedar muy negativa por ese gasto de 8,5M (si esa plata no salió de la cuenta del negocio sino de otra bolsa). Eso habría que revisarlo aparte.
-Mi recomendación
-Antes de subirlo a producción, pruébalo primero en el artefacto de aquí (que ya está conectado a tu Firebase real). Ábrelo, deja que corra la migración, refresca y mírame los dos números:
-
-¿Efectivo físico ahora = ~200?
-¿En cuenta (real) quedó bien o muy negativa?
-Si ambos cuadran, subes a GitHub con toda confianza. Si algo sale raro, me dices los números y lo ajusto antes de que toque tu base de producción.
-
-Una advertencia clave: como la migración ya se aplica en el artefacto de aquí (porque usa la misma base), ojo — se ejecuta contra tu Firebase real, no una copia. Así que la prueba de aquí ya es "real". ¿Quieres probarlo primero aquí y me dices los números, o prefieres subirlo directo a GitHub?
-
-
-
-
-
-no esta funcionado para conectar con firebase se esta quedando conectando
-
-Aug 8, 4:00 PM
-
-
-Show reasoning
-Eso casi siempre es por el entorno de vista previa, no por tu código. El artefacto aquí corre dentro de un iframe con restricciones de red/seguridad, y muchas veces bloquea la conexión a Firebase, por eso se queda en "Conectando..." para siempre. En tu sitio de GitHub Pages, que ya te conectaba antes, sí debería funcionar.
-
-Cómo confirmarlo rápido
-Pruébalo en tu sitio de GitHub Pages, no en la vista previa de aquí. Sube el index.html, haz commit, espera 1-2 min y ábrelo con Ctrl + Shift + R. Si ahí marca "Conectado", entonces todo está bien y era solo el sandbox de la vista previa.
-Si prefieres, abre el artefacto en una pestaña nueva del navegador (fuera del panel de preview) — a veces así sí conecta.
-Si tampoco conecta en GitHub Pages
-Abre la consola (F12 → pestaña Console) en tu página y mira si sale un error en rojo. Los más comunes:
-
-Error de reglas de Firestore (tipo Missing or insufficient permissions): las reglas de tu base están en modo restringido. Se arregla en Firebase → Firestore → Rules.
-Error de red / CSP: es el entorno bloqueando, no el código.
-Cuéntame qué dice exactamente el mensaje en rojo de la consola (cópiamelo) y en dónde estás probando (la vista previa de aquí o tu sitio de GitHub), y con eso te digo la causa exacta.
-
-Un dato clave para descartar: antes de estos últimos cambios, ¿en tu sitio de GitHub sí te conectaba a Firebase con normalidad? Si la respuesta es sí, el problema es solo la vista previa de aquí, y basta con probarlo en GitHub Pages.
-
-¿Quieres que te guíe paso a paso para abrir la consola y pegar el error que aparece aquí?
-
-
-
-
-
-como vuelvo un commit atras del codigo index en git hub
-
-Aug 8, 4:05 PM
-
-
-Show reasoning
-Hay varias formas de volver al commit anterior en GitHub. Te doy la más fácil (desde la web, sin usar terminal) y también la definitiva.
-
-Opción A — Ver y copiar la versión anterior (la más simple y segura)
-Entra a tu repo TulavadoVipProd en GitHub.
-Haz clic en "commits" (arriba, donde aparece el reloj 🕐 con el número de commits).
-Busca el commit anterior al que quieres deshacer (el que estaba bien) y haz clic en él.
-A la derecha del archivo, haz clic en el botón "< >" (View file / "Ver archivo en este punto").
-Ahí ves el index.html viejo. Dale al botón Raw, selecciona todo (Ctrl+A), copia (Ctrl+C).
-Vuelve a tu index.html actual → botón editar (lápiz ✏️) → borra todo y pega la versión vieja → Commit changes.
-Esto crea un commit nuevo con el contenido viejo. Es lo más seguro porque no borras historial.
-
-Opción B — Revertir el commit (deshacer automático)
-En tu repo, entra a "commits".
-Abre el commit que quieres deshacer.
-Arriba a la derecha hay un botón "..." (tres puntos) → "Revert" (Revertir).
-GitHub crea un commit que deshace exactamente esos cambios. Confirma con Commit changes.
-Nota: el botón "Revert" a veces solo aparece si el commit se hizo vía Pull Request; si no lo ves, usa la Opción A.
-
-Opción C — Terminal (si usas Git en tu PC)
-git revert HEAD        # deshace el último commit creando uno nuevo (seguro)
-git push
-bash
-
-O si quieres borrarlo del todo (peligroso, reescribe historial):
-
-git reset --hard HEAD~1
-git push --force
-bash
-
-Mi recomendación
-Usa la Opción A. Es la más segura, no borra nada del historial, y te deja ver exactamente qué versión estás recuperando antes de publicarla. Después espera 1-2 min y abre con Ctrl + Shift + R.
-
-Un consejo: si el problema era solo que no conectaba a Firebase en la vista previa de aquí, quizá no necesites revertir nada — recuerda que en GitHub Pages sí debería conectar. Revertir tiene sentido si en tu sitio real algo dejó de funcionar tras el último commit.
-
-¿Qué pasó exactamente que quieres devolverte — algo se dañó en tu sitio de GitHub después del último commit, o es por lo de la conexión a Firebase?
-
-
-
-
-
-listo ahora pasame lo que dice wix y lo que dice la app
-
-Aug 8, 4:12 PM
-
-
-Show reasoning
-Aquí tienes la comparación clara entre lo que dice el reporte de Wix y lo que debe quedar reflejado en la app, según todo lo que acomodamos.
-
-Ventas de lavado (compartido 65/35) — reporte de Wix
-Fecha	Pedidos	Ventas lavado	Efectivo cobrado	Queda debiendo
-2026-08-03	9	469.000	319.000	150.000
-2026-08-04	13	560.000	405.000	155.000
-2026-08-05	5	205.000	120.000	85.000
-2026-08-06	10	635.000	595.000	40.000
-2026-08-07	4	200.000	155.000	45.000
-TOTAL	41	2.069.000	1.594.000	475.000
-
-
-
-Wix vs. App
-Concepto	Wix (reporte)	App (debe mostrar)
-Total generado por lavado	2.069.000	2.069.000 (compartido 65/35)
-Efectivo cobrado por lavado	1.594.000	entra a la caja
-Pagos con tarjeta	0	cuenta virtual no cambia por Wix
-Deuda pendiente (por cobrar)	475.000	parte de tus 631.000 totales
-Parqueadero	no está en Wix	se suma aparte (dato de la app)
-Reparto	—	negocio 65% = 1.344.850 · lavadores 35% = 724.150
-
-
-
-Puntos clave
-Wix solo tiene las ventas de lavado. El parqueadero, los gastos y las otras deudas viven solo en la app (Firebase), no en este reporte.
-Todo se pagó en efectivo en Wix (no hubo tarjeta), así que tu cuenta virtual no se mueve por estas ventas — el único ingreso a la virtual sería otra cosa que tengas registrada aparte.
-Los 475.000 de deuda de Wix son una parte de los 631.000 totales que me dijiste que te deben (los otros 156.000 vienen de deudas registradas directo en la app).
-Un aviso honesto: los números de la columna "App" son los que deberían aparecer según lo que acomodamos, pero no puedo leer tu Firebase desde aquí para confirmarlos en vivo. Para verlos reales, abre la app en tu sitio de GitHub (donde sí conecta), deja correr la migración, refresca y compara con esta tabla.
-
-Si me dices los números que te muestra la app ahora mismo (Total generado, En efectivo real, Efectivo físico ahora, Nos falta por cobrar), te hago la comparación exacta lado a lado y te señalo cualquier desfase.
-
-
-
-
-
-el reporte de wix me refiero
-
-Aug 8, 4:13 PM
-
-
-Show reasoning
-Voy a leer el reporte de Wix (Pedidos.csv) completo para darte exactamente lo que dice.
-
-Show work
-Aquí está exactamente lo que dice el reporte de Wix (Pedidos.csv), leído directo del archivo: 41 pedidos entre el 3 y el 7 de agosto de 2026.
-
-Reporte de Wix — ventas de lavado por día
-Fecha	Pedidos	Total generado	Pagado	Queda debiendo (No pagado)
-Ago 3, 2026	9	469.000	319.000	150.000
-Ago 4, 2026	13	560.000	405.000	155.000
-Ago 5, 2026	5	205.000	120.000	85.000
-Ago 6, 2026	10	635.000	595.000	40.000
-Ago 7, 2026	4	200.000	155.000	45.000
-TOTAL	41	2.069.000	1.594.000	475.000
-
-
-
-Detalle de estados de pago
-24 pedidos "Pagado" → 1.594.000 (todos "Pagar personalmente" / efectivo).
-17 pedidos "No pagado" → 475.000 (lo que queda debiendo).
-Pagos con tarjeta: 0 (la columna "Monto de la tarjeta" viene vacía en todos).
-En resumen, Wix dice:
-Total vendido en lavado: 2.069.000
-Ya cobrado (efectivo): 1.594.000
-Por cobrar (deuda): 475.000
-Todo se cobró en efectivo, así que en la app estos 1.594.000 entran a la caja y los 475.000 quedan como deuda compartida (65/35) por cobrar. Estos son los números reales del CSV que subiste.
-
-¿Quieres que compare estos valores con lo que te muestra la app ahora? Si sí, pásame: Total generado, En efectivo real, Efectivo físico ahora y Nos falta por cobrar.
-
-
-
-
-
-¿Qué vamos a hacer? Quiero que en el código me pongas una condicional de que ahorita lo que haya en la base de datos le vamos a restar a todo el dinero que tenemos en efectivo y a toda la cuenta que tenemos en efectivo y el efectivo neto le vamos a restar 715 mil pesos Es que eso fue una deuda de vales, una mañana que pagamos de vales y que pagamos además de eso unos insumos que necesitábamos y nos los retiramos de la plata del efectivo entonces quiero que los restes independientemente de lo que haya en la base de datos y siempre pongas esa resta de 715 mil pesos para comenzar, para restarle lo que haya actualmente en Fireface y así que se acomoden todos los números, porque eso si ya serían los números reales
-
-11:28 AM
-
-
-Show reasoning
-Voy a agregar ese ajuste fijo de 715.000 que se resta siempre del efectivo (tanto del "real" como del "físico"). Primero reviso la función de KPIs en el archivo.
-
-Show work
-Ahora aplico el ajuste fijo de 715.000 que se resta siempre del efectivo real y del efectivo físico.
-
-Show work
-Ahora valido que el JavaScript quede sin errores de sintaxis.
-
-Show work
-Listo. Apliqué el ajuste y el JavaScript quedó validado sin errores. El artefacto tu_lavado_vip.html ya está actualizado en el panel.
-
-Qué agregué
-Puse una constante fija AJUSTE_EFECTIVO = 715.000 que se resta siempre del efectivo, sin importar lo que haya en la base de datos. Esto representa esa madrugada en que pagaron vales + insumos sacando la plata directo de la caja.
-
-Se descuenta en los dos indicadores de efectivo:
-
-En efectivo (real) = caja + deudas pendientes + cobros efectivo − gastos efectivo − vales efectivo − 715.000
-Efectivo físico ahora = caja + cobros efectivo − gastos efectivo − vales efectivo − 715.000
-Lo que NO se toca
-No modifica la base de datos. Es un descuento visual permanente en el cálculo, así que no borra ni cambia ningún día, deuda, gasto ni venta en Firebase.
-Cuenta virtual, deudas, ventas y utilidad quedan igual — el ajuste solo baja el efectivo.
-Así, cualquiera que sea el efectivo que salga de tus datos reales de Firebase, siempre se le restan esos 715.000, y los números quedan como el efectivo verdadero que tienes.
-
-El código completo lo tienes en el panel (botón de copiar) y para descargar:
-
-
-Un detalle honesto: como es un valor fijo "quemado" en el código, si algún día ese gasto de 715.000 lo llegas a registrar también como un cierre/gasto normal en la app, se restaría dos veces. Mientras solo lo tengas aquí como ajuste, está perfecto. Si prefieres que en vez de fijo sea editable desde la pantalla (un campito de "ajuste de caja"), dímelo y lo cambio.
-
-
-Tu Lavado Vip
-Interactive
-
-
-
-
-en total, bueno todos los demás números, recuerda que con lo que tenemos en la cuenta más, lo que tenemos en efectivo, es ver lo que podemos calcular, todos los otros números, quiero que todos tengan la misma idea.
-
-11:30 AM
-
-
-Show reasoning
-Entiendo: ese descuento de 715.000 es plata real que salió, así que debe reflejarse en todos los totales con la misma lógica, no solo en los dos de efectivo. Voy a revisar la función de KPIs para aplicarlo de forma consistente.
-
-Show work
-Entendido. La idea es que todos los totales se construyan con la misma base — lo que tenemos en efectivo + lo que tenemos en cuenta — para que ese descuento de 715.000 fluya de forma consistente por todos los números, no solo por los dos de efectivo. Reescribo el bloque de KPIs para que quede coherente.
-
-Show work
-Listo. El JavaScript quedó validado sin errores y el artefacto tu_lavado_vip.html ya está actualizado en el panel.
-
-Qué hice: unifiqué todos los números bajo la misma idea
-Ahora todos los totales se calculan desde la misma base — el efectivo real + la cuenta real — para que el descuento de 715.000 (y cualquier gasto o vale) fluya parejo por todos, sin cálculos sueltos por un lado y por otro.
-
-Definí tres bloques base y de ahí sale todo lo demás:
-
-Efectivo real = caja + deudas por cobrar + cobros efectivo − gastos efectivo − vales efectivo − 715.000
-Cuenta real = virtual + cobros tarjeta − gastos tarjeta − vales tarjeta
-Efectivo físico ahora = Efectivo real − deudas por cobrar
-Y los totales grandes ahora se arman con esos bloques:
-
-Indicador	Cómo se calcula ahora
-Total sin deuda	Efectivo físico + Cuenta real (la plata que tenemos hoy)
-Total con deuda	Efectivo real + Cuenta real (cuando paguen todo)
-Utilidad negocio	utilidad − 715.000 (refleja la plata que salió)
-En efectivo (real)	incluye el −715.000
-Efectivo físico ahora	incluye el −715.000
-
-
-
-Así se cumple lo que pediste: lo que tenemos = efectivo + cuenta, y esa resta de 715.000 se ve reflejada de forma consistente en todos los números, no solo en uno. La diferencia entre "Total con deuda" y "Total sin deuda" es exactamente lo que te deben, así que todo queda cuadrado entre sí.
-
-El código completo lo tienes en el panel (botón de copiar) y para descargar:
-
-
-Un detalle honesto sobre Total generado: ese lo dejé como las ventas brutas (lavados + parqueadero), porque es cuánto se facturó, no cuánta plata queda — restarle el gasto ahí sería mezclar ventas con egresos. Si tú quieres que ese también baje los 715.000, dime y lo ajusto, pero contablemente lo correcto es dejarlo como está.
-
-
-Tu Lavado Vip
-Interactive
-
-
-
-
-billet.png
-Revisa porque está quedando mal en la cuenta. Me está diciendo un dato negativo menos 7.115.000 cuando el dato verdadero que debe haber ahí es 1.317.000. Entonces cuadra eso que dice en la cuenta porque en la cuenta debería ir eso. Entonces súmale a eso lo que haya que sumarlo y mira bien la lógica porque está mal. Están mal esos números. Tu deberías escoger lo que hay en efectivo real. Lo que hay en efectivo real más lo que hay en la cuenta que te estoy diciendo lo que hay y con eso modificar todos nuestros KPIs, todo lo de la utilidad del negocio según con los gastos que tenemos. Las deudas siguen siendo iguales. Mira que las deudas también no sé por qué me estás poniendo en negativo. Sí, sí, sí, no debería ser así. Ah, bueno, las deudas sí, porque es que sí, pero me necesito que mires toda la lógica porque en cuenta no debe estar, no queda negativo, por favor. En cuenta debe quedar lo que te digo, debe quedar 1.317.000 pesos y en base a eso reconfigura todo, lo de total generado, bueno, todo.
-
-11:49 AM
-
-
-Show 3 steps
-Ya veo el problema en la captura: En cuenta (real): −$7.115.000. Eso lo está causando el gasto grande de ~8,5M que marcamos como tarjeta — al restarlo de la cuenta virtual, la hunde en negativo y arrastra todos los demás totales (utilidad −7,1M, total sin deuda −6,1M, etc.). Voy a revisar el bloque de KPIs para arreglar la lógica de raíz.
-
-Show work
-Ya identifiqué exactamente el problema: ese gasto grande de ~8,5M (marcado como tarjeta) estaba restándose de la cuenta virtual y por eso la hundía a −7.115.000, y de paso arrastraba la utilidad y los totales a negativo. Voy a anclar la cuenta al valor real que me diste (1.317.000) y neutralizar ese gasto extraordinario de forma consistente en todos los KPIs (utilidad y gastos incluidos), para que ninguno quede negativo por esa causa.
-
-Show work
-Ahora actualizo la descripción del KPI de cuenta y valido la sintaxis.
-
-Show work
-El JavaScript quedó válido. Verifiqué los números con los datos de tu captura y ahora todo queda positivo y consistente:
-
-KPI	Antes (mal)	Ahora (real)
-En cuenta (real)	−7.115.000	1.317.000 ✓
-En efectivo (real)	998.500	998.500
-Efectivo físico ahora	917.500	917.500
-Gastos (operativos)	8.540.500	~108.500
-Utilidad negocio	−7.170.200	~1.261.800
-Total sin deuda	−6.197.500	~2.234.500
-Total con deuda	−6.116.500	~2.315.500
-Nos falta (por cobrar)	81.000	81.000 (igual)
-
-
-
-Qué corregí y con qué lógica
-El problema era ese gasto extraordinario de ~8,5M en tarjeta: se restaba de la cuenta virtual y la volvía negativa, y de paso hundía la utilidad y los totales. Como esa plata no salió de la operación normal, hice lo siguiente:
-
-Anclé "En cuenta (real)" a tu valor real: 1.317.000 (constante CUENTA_REAL_FIJA en el código, editable si algún día cambia).
-Neutralicé el mismo gasto extraordinario en todos los números con la misma idea, para que ninguno quede negativo por esa causa: la utilidad y los gastos operativos se recalculan quitando ese extraordinario.
-Todo se arma desde "efectivo real + cuenta real", tal como pediste:
-Total sin deuda = efectivo físico + cuenta
-Total con deuda = efectivo real + cuenta
-Las deudas quedan igual (81.000 por cobrar), sin tocarlas.
-El código completo está en el panel (botón de copiar) y para descargar:
-
-
-Un aviso honesto: como no puedo leer tu Firebase desde aquí, usé los números de tu captura para calcular. Los 1.317.000 quedan fijos como saldo real de la cuenta; si más adelante entra plata nueva a la cuenta virtual y quieres que sume sobre esa base, dime y lo cambio para que el ancla sea un punto de partida en vez de un valor fijo. Súbelo a GitHub, abre con Ctrl+Shift+R y confírmame que la cuenta ya muestra 1.317.000.
-
-
-Tu Lavado Vip
-Interactive
-
-
-
-
-Entiendo perfectamente lo que está sucediendo. Y si esos menos 8 millones 500 no se lo restes a la cuenta. Pero a partir de adelante, si o bueno, esa plata a partir de adelante si está igual. Todo lo que se todas las deudas que se cobren en virtual van a entrar a virtual. Todos los gastos que se hagan en virtual van a restar a virtual. Todos los vales que se pagan en virtual van a restar en el virtual. Y vice y es la misma la misma situación viceversa con lo mismo, pero con efectivo, no? Entonces todos los vales que se paguen en efectivo se va a descontar en efectivo. Y así y recuerda que todas las deudas por default se van en efectivo y el efectivo físico es esa plata menos las deudas para saber cuánto tenemos realmente en en cash y es eso es todo. Así de resto, modifica bien que todas las lógicas queden bien y pasan atrás del código. De resto, lo otro que hiciste bajar el efectivo y restarle lo que necesitábamos restarle quedó súper bien.
-
-11:52 AM
-
-
-Show reasoning
-Entiendo perfectamente. En vez de "anclar" la cuenta a un número fijo, voy a excluir ese gasto extraordinario de ~8,5M de todos los cálculos (para que no hunda nada), y dejar la lógica normal funcionando de forma natural para todo lo demás: cada movimiento en virtual afecta virtual, cada movimiento en efectivo afecta efectivo, y de aquí en adelante todo suma/resta como debe. Primero reviso el bloque actual.
-
-Show work
-Ahora entiendo la lógica correcta que quieres: nada de anclar la cuenta a un número fijo. Voy a detectar ese gasto extraordinario (la compra enorme) y excluirlo de todos los cálculos, dejando que la cuenta y el efectivo se computen naturalmente — así cada movimiento futuro (deuda, gasto o vale, en efectivo o virtual) resta/suma en el lado correcto por sí solo.
-
-Show work
-Ahora actualizo la descripción del KPI de cuenta y valido la sintaxis del JavaScript.
-
-Show work
-Listo. El JavaScript quedó validado sin errores y el artefacto tu_lavado_vip.html está actualizado en el panel.
-
-Qué cambié (la lógica correcta que pediste)
-Quité el número fijo "anclado". Ahora el código detecta ese gasto extraordinario de ~8,5M y lo excluye de todos los cálculos, dejando que cuenta y efectivo se computen naturalmente:
-
-Cualquier gasto de un día mayor a 2.000.000 se trata como extraordinario y no cuenta en la cuenta, ni en el efectivo, ni en los gastos, ni en la utilidad. Los gastos normales (~250.000) no se afectan para nada.
-Con eso, la cuenta real = virtual + cobros tarjeta − gastos tarjeta − vales tarjeta, sin ese gasto gigante → te da los 1.317.000 correctos (antes daba −7.115.000 justamente porque le restaba el extraordinario).
-La regla de cada lado, tal como la dijiste (de aquí en adelante, natural)
-Virtual (cuenta): deudas cobradas en tarjeta suman a virtual · gastos en tarjeta restan de virtual · vales en tarjeta restan de virtual.
-Efectivo (caja): deudas cobradas en efectivo suman a caja · gastos en efectivo restan de caja · vales en efectivo restan de caja.
-Todas las deudas por default van al efectivo hasta que se cobren.
-Efectivo físico = efectivo real − deudas (lo que de verdad tienes en cash).
-El −715.000 de esa madrugada (vales + insumos) se mantiene restado del efectivo, como quedó bien.
-Resultado esperado
-En cuenta (real): 1.317.000 ✓
-En efectivo (real) y Efectivo físico: con el −715.000 aplicado, como estaban bien.
-Utilidad, Total sin/con deuda: ya no quedan negativos, porque todos se arman desde efectivo real + cuenta real, sin el gasto extraordinario.
-Deudas: siguen igual, sin tocarse.
-El código completo está en el panel (botón de copiar) y para descargar:
-
-
-Un aviso honesto: el "gasto extraordinario" se excluye por su tamaño (mayor a 2 millones). Eso funciona perfecto para esta compra de 8,5M, pero si algún día registras otro gasto legítimo mayor a 2 millones que sí quieras contar, ese también quedaría excluido. Si prefieres que en vez de un umbral automático marquemos ese gasto puntual con una etiqueta fija, dímelo y lo cambio. Súbelo a GitHub, abre con Ctrl+Shift+R y confírmame que la cuenta ya muestra 1.317.000.
-
-
-Tu Lavado Vip
-Interactive
-
-
-
-
-Ese gasto no lo debemos poner vigente, es que ese es un gasto que todavía no existe, es un gasto fijo que tenemos de la rienda, pero todavía no se ha pagado ni en cash ni en efectivo. Lo que tienes que hacer es que ese gasto sí es contarlo, pero más no descontarlo de las bases de datos de efectivo ni virtual. Eso es lo que pasa, el día que paguemos, el día que paguemos, sí que ese gasto ya lo legalicemos y lo dejemos, o sea, déjamelo más bien abierto, que todavía no se haya guardado ese gasto. Eso es lo que yo quiero que sepas, ¿listo? Que lo dejes abierto y que no se lo descuentes a, o sea, sí se lo descuentes a la utilidad, a todas las GPIs, hagas la lógica con todos los GPIs, menos todavía restándoselo al efectivo o el cash, porque todavía no lo hemos cobrado. Eso es lo que quiero hacerte entender.
-
-11:56 AM
-
-
-
-Show reasoning
-Entiendo perfectamente ahora. Ese gasto de ~8,5M es un gasto fijo (arriendo) que aún no se paga, así que: sí cuenta en la utilidad y demás KPIs (es una obligación real), pero NO se resta del efectivo ni de la cuenta porque todavía no ha salido esa plata. Voy a revisar el bloque actual para ajustarlo.
-
-Show work
-Ahora entiendo bien la diferencia. Ese gasto de arriendo (~8,5M) es una obligación que aún no se paga, así que: sí debe restar la utilidad (es un costo real que ya debemos) y contarse en Gastos, pero NO debe salir del efectivo ni de la cuenta porque la plata todavía no ha salido. Aplico ese ajuste.
-
-Show work
-¡Listo! El JavaScript quedó validado sin errores y el artefacto tu_lavado_vip.html ya está actualizado en el panel.
-
-Qué cambié: el arriendo ahora se trata como "gasto pendiente"
-Ese gasto grande de ~8,5M (el arriendo fijo que aún no han pagado) ahora tiene la lógica correcta que pediste:
-
-Dónde	Antes	Ahora
-En efectivo (real)	no lo restaba	sigue sin restarlo ✓ (la plata no ha salido)
-En cuenta (real)	no lo restaba	sigue sin restarlo ✓ → te da los 1.317.000
-Efectivo físico	no lo restaba	sigue sin restarlo ✓
-Total sin/con deuda	no lo restaba	sigue sin restarlo ✓ (es plata que aún tienes)
-Gastos (KPI)	lo ocultaba	ahora sí lo cuenta ✓
-Utilidad del negocio	lo cancelaba	ahora sí lo resta ✓ (es un costo real que ya deben)
-
-
-
-La idea en una frase
-El arriendo no toca tu plata (efectivo ni cuenta), porque todavía no lo has pagado — queda "abierto". Pero sí baja la utilidad y aparece en Gastos, porque es un costo real que ya tienes encima.
-
-Por eso ahora verás una diferencia sana: tu utilidad será menor que tu plata disponible, y esa diferencia es justo el arriendo que debes pagar. El día que lo pagues (de efectivo o de la cuenta), ahí sí saldrá de la caja correspondiente y todo quedará cerrado.
-
-Todo lo demás sigue con la lógica natural que acordamos: cada deuda, gasto o vale afecta su propio lado (efectivo o virtual), las deudas por default van al efectivo, el efectivo físico = efectivo real − deudas, y el −715.000 de esa madrugada se mantiene restado del efectivo.
-
-El código completo está en el panel (botón de copiar) y para descargar:
-
-
-Súbelo a GitHub, abre con Ctrl+Shift+R y confírmame que: la cuenta muestra 1.317.000, el efectivo queda con su −715.000 aplicado, y la utilidad ya refleja el arriendo como costo.
-
-
-Tu Lavado Vip
-Interactive
-
-
-
-
-
-
-
-
-
-
-
-
-View moreThis assistant uses generative AI to help produce responses. AI-generated content may be inaccurate, incomplete, or outdated. Always review and verify outputs before using them for business, clinical, regulatory, or customer-facing purposes. Use of AI generated output without verification in quality process can lead to legal or compliance issue. Do not enter patient information, personal data, or other sensitive confidential information unless the system is explicitly approved for that use. Users remain responsible for validating and approving all final content and decisions.
-Tu Lavado Vip
-Updated 28m ago
-
-
-
-1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-30
-31
-32
-33
-34
-35
-36
-37
-38
-39
-40
-41
-42
-43
-44
-45
-46
-47
-48
-49
-50
-51
-52
-53
-54
-55
-56
-57
-58
-59
-60
-61
-62
-63
-64
-65
-66
-67
-68
-69
-70
-71
-72
-73
-74
-75
-76
-77
-78
-79
-80
-81
-82
-83
-84
-85
-86
-87
-88
-89
-90
-91
-92
 <!DOCTYPE html>
 <html lang="es" data-theme="light">
 <head>
@@ -663,3 +90,1433 @@ label.field.debt input{border-color:var(--artifact-red)}
 .lav-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 @media(max-width:640px){.lav-head .btn{width:100%;justify-content:center;padding:12px}}
 table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--artifact-border)}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--artifact-text-soft);font-weight:700}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tfoot td{font-weight:700;border-top:2px solid var(--artifact-border)}
+.table-wrap{overflow:auto;max-height:520px;border:1px solid var(--artifact-border);border-radius:var(--artifact-radius)}
+.empty{text-align:center;color:var(--artifact-text-soft);padding:40px;font-size:.9rem}
+.badge-lock{font-size:.68rem;color:var(--artifact-text-soft);background:var(--artifact-surface-2);border:1px solid var(--artifact-border);padding:2px 7px;border-radius:999px;margin-left:6px}
+.badge-val{font-size:.68rem;color:var(--artifact-red);background:var(--artifact-red-soft);border:1px solid var(--artifact-red);padding:2px 7px;border-radius:999px;margin-left:6px;font-weight:700}
+.badge-net{font-size:.66rem;color:var(--artifact-green);background:var(--artifact-green-soft);border:1px solid var(--artifact-green);padding:1px 6px;border-radius:999px;font-weight:700;margin-right:4px}
+.badge-assign{font-size:.68rem;color:var(--artifact-amber);background:rgba(184,134,11,.12);border:1px solid var(--artifact-amber);padding:2px 7px;border-radius:999px;margin-left:6px;font-weight:700}
+.mini-btn{font:inherit;font-size:.7rem;font-weight:700;border:1px solid var(--artifact-amber);color:var(--artifact-amber);background:rgba(184,134,11,.12);padding:3px 9px;border-radius:999px;cursor:pointer;margin-left:6px;white-space:nowrap}
+.mini-btn:hover{background:var(--artifact-amber);color:#fff}
+.mini-btn.red{border-color:var(--artifact-red);color:var(--artifact-red);background:var(--artifact-red-soft)}
+.mini-btn.red:hover{background:var(--artifact-red);color:#fff}
+.modal .wash-row{grid-template-columns:1fr 110px 40px}
+.modal #assignWashersList{margin-bottom:4px}
+.park-col{color:var(--artifact-teal);font-weight:600}
+.debt-col{color:var(--artifact-red);font-weight:700}
+.debt-who{display:block;font-size:.72rem;color:var(--artifact-text-soft);font-weight:400;text-align:right}
+tr.has-debt{background:var(--artifact-red-soft)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.toolbar .grow{margin-left:auto}
+.hint{font-size:.82rem;color:var(--artifact-text-soft);background:var(--artifact-accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:20px}
+.setbar{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--artifact-text-soft);margin-bottom:18px;flex-wrap:wrap}
+.setbar input{width:80px}
+.cloud{font-size:.74rem;font-weight:700;padding:6px 11px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--artifact-border)}
+.cloud.on{color:var(--artifact-green);background:var(--artifact-green-soft);border-color:var(--artifact-green)}
+.cloud.off{color:var(--artifact-red);background:var(--artifact-red-soft);border-color:var(--artifact-red)}
+.cloud.wait{color:var(--artifact-text-soft);background:var(--artifact-surface-2)}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-back.open{display:flex}
+.modal{background:var(--artifact-surface);border:1px solid var(--artifact-border);border-radius:var(--artifact-radius);box-shadow:var(--artifact-shadow);width:100%;max-width:420px;padding:22px}
+.modal h3{margin:0 0 4px;font-size:1.05rem}
+.modal p.sub{margin:0 0 16px;font-size:.82rem;color:var(--artifact-text-soft)}
+.modal form{display:grid;gap:12px}
+.modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+.cargar-info{font-size:.82rem;background:var(--artifact-accent-soft);border:1px solid var(--artifact-accent);color:var(--artifact-text);border-radius:10px;padding:10px 12px;line-height:1.5}
+.cargar-info b{font-weight:700}
+.cargar-info .ci-title{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--artifact-text-soft);font-weight:700;margin-bottom:4px}
+.cargar-info .ci-sh{color:var(--artifact-amber)}
+.cargar-info .ci-nt{color:var(--artifact-green)}
+.bell{position:relative}
+.bell .dot{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--artifact-red);color:#fff;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid var(--artifact-background)}
+.btn.bell.hasnew{border-color:var(--artifact-red);color:var(--artifact-red);background:var(--artifact-red-soft);font-weight:800;animation:bellshake .8s infinite}
+.btn.bell.hasnew .bell-ico{display:inline-block;transform-origin:50% 0;animation:bellring 1s infinite}
+@keyframes bellshake{0%,100%{transform:translateX(0)}15%{transform:translateX(-3px)}30%{transform:translateX(3px)}45%{transform:translateX(-3px)}60%{transform:translateX(2px)}75%{transform:translateX(-2px)}}
+@keyframes bellring{0%,60%,100%{transform:rotate(0)}10%{transform:rotate(18deg)}20%{transform:rotate(-16deg)}30%{transform:rotate(12deg)}40%{transform:rotate(-8deg)}50%{transform:rotate(4deg)}}
+@keyframes bellpulse{0%,100%{box-shadow:0 0 0 0 rgba(209,67,91,.35)}50%{box-shadow:0 0 0 8px rgba(209,67,91,0)}}
+.note-item{border:1px solid var(--artifact-border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--artifact-surface-2)}
+.note-item.new{border-color:var(--artifact-red);background:var(--artifact-red-soft)}
+.note-item .meta{font-size:.72rem;color:var(--artifact-text-soft);margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+.note-item .txt{font-size:.9rem;white-space:pre-wrap}
+.mkt-wrap{display:none}
+.mkt-wrap.show{display:block}
+.chk-row{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:600;color:var(--artifact-text);cursor:pointer}
+.chk-row input{width:auto;margin:0}
+.modal textarea{font:inherit;font-size:.9rem;padding:9px 11px;border:1px solid var(--artifact-border);border-radius:9px;background:var(--artifact-background);color:var(--artifact-text);min-height:80px;resize:vertical}
+.modal textarea:focus{outline:none;border-color:var(--artifact-accent)}
+@media(max-width:640px){
+  .shell{padding:0 12px 48px}
+  header.topbar{padding:12px 12px}
+  .topbar-inner{gap:10px}
+  .brand{width:100%;margin-right:0}
+  .brand h1{font-size:1.05rem}
+  .topbar-inner .btn{flex:1 1 calc(50% - 5px);justify-content:center;padding:10px 8px;font-size:.82rem}
+  .tabs{gap:8px}
+  .tab{flex:1;text-align:center}
+  .entry{grid-template-columns:1fr}
+  .entry-actions .btn.primary{width:100%;justify-content:center;padding:12px}
+  .wash-row{grid-template-columns:1fr 110px 40px}
+  .kpis{grid-template-columns:1fr 1fr;gap:12px}
+  .kpi{padding:14px}
+  .kpi .val{font-size:1.3rem}
+  .card{padding:16px}
+  .chart{height:260px}
+  .card.tall .chart{height:300px}
+  table{font-size:.82rem}
+  th,td{padding:8px 9px}
+  .table-wrap table{min-width:880px}
+  .setbar{font-size:.82rem}
+  .setbar input{width:70px}
+}
+@media(max-width:380px){
+  .kpis{grid-template-columns:1fr}
+}
+.warn{color:var(--artifact-red);font-weight:700}
+.section-title{font-size:1.15rem;margin:0 0 4px}
+.section-sub{color:var(--artifact-text-soft);font-size:.88rem;margin:0 0 20px}
+.pos{color:var(--artifact-green)}.neg{color:var(--artifact-red)}
+@media print{
+  header.topbar,.tabs,#entryForm,.toolbar,.btn,button,.setbar,.modal-back{display:none!important}
+  .view{display:block!important;break-inside:avoid;margin-bottom:24px}
+  body{background:#fff;padding:.4in .6in;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .card,.kpi{break-inside:avoid;box-shadow:none;border:1px solid rgba(0,0,0,.1)}
+  .chart{height:240px!important}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
+/* ---------- footer iluminado ---------- */
+.site-footer{margin:48px auto 0;max-width:1100px;padding:26px 20px 34px;text-align:center}
+.site-footer .fdev{
+  font-size:1.05rem;font-weight:800;letter-spacing:.02em;
+  background:linear-gradient(90deg,#5a8bff,#2dd4bf,#17915b,#5a8bff);
+  background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:footshine 6s linear infinite;
+}
+.site-footer .fname{
+  display:inline-block;margin-top:6px;font-size:1.5rem;font-weight:900;letter-spacing:.01em;
+  color:#fff;
+  text-shadow:0 0 6px rgba(90,139,255,.9),0 0 16px rgba(45,212,191,.7),0 0 28px rgba(90,139,255,.55);
+  animation:footglow 2.6s ease-in-out infinite alternate;
+}
+.site-footer .fsub{margin-top:8px;font-size:.8rem;color:var(--artifact-text-soft);letter-spacing:.03em}
+.site-footer .fline{width:120px;height:3px;margin:14px auto 0;border-radius:999px;
+  background:linear-gradient(90deg,transparent,#5a8bff,#2dd4bf,transparent);
+  animation:footshine 4s linear infinite}
+@keyframes footglow{
+  from{text-shadow:0 0 6px rgba(90,139,255,.7),0 0 14px rgba(45,212,191,.5),0 0 22px rgba(90,139,255,.4)}
+  to{text-shadow:0 0 12px rgba(90,139,255,1),0 0 26px rgba(45,212,191,.9),0 0 42px rgba(90,139,255,.75)}
+}
+@keyframes footshine{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+@media print{.site-footer{display:none!important}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><h1>Tu Lavado <b>VIP</b> · Contabilidad</h1><span>Cierre diario · Sincronizado en la nube (Firestore)</span></div>
+    <span id="cloudStatus" class="cloud wait">Conectando...</span>
+    <button class="btn primary" onclick="openPark()">＋ Registrar parqueadero</button>
+    <button class="btn" onclick="openCobro()">＄ Cobrar deuda</button>
+    <button class="btn" onclick="openCargar()">＋ Cargar deuda</button>
+    <button class="btn bell" id="btnNotas" onclick="openNotas()"><span class="bell-ico">🔔</span> Pendientes<span class="dot" id="notasDot" style="display:none">0</span></button>
+    <button class="btn" onclick="exportExcel()">Exportar Excel</button>
+    <button class="btn" onclick="exportUltimos4()">Reporte últimos 4 días</button>
+  </div>
+</header>
+
+<div class="shell">
+  <div class="tabs">
+    <div class="tab active" data-view="cierre">Cierre diario</div>
+    <div class="tab" data-view="resumen">Resumen</div>
+    <div class="tab" data-view="lavadores">Lavadores</div>
+  </div>
+
+  <!-- CIERRE DIARIO -->
+  <section class="view active" id="cierre">
+    <h2 class="section-title">Registrar el día</h2>
+    <p class="section-sub">Agrega cuánto se hizo (efectivo + cuenta) y los gastos del día. Abajo asigna cuánto hizo cada lavador: la suma debe cuadrar exactamente con efectivo + cuenta. Si alguien quedó debiendo, el día quedará <b class="warn">en validación</b> (no cerrado) hasta que se cierren esas cuentas. El parqueadero se registra aparte con el botón de arriba.</p>
+
+    <div class="setbar">
+      <span>% que se quedan los lavadores:</span>
+      <input type="number" id="commPct" min="0" max="100" step="1" value="35">
+      <span>-> el negocio se queda con <b id="bizPctLbl">65%</b>.</span>
+    </div>
+
+    <div class="card" style="margin-bottom:22px">
+      <form id="entryForm">
+        <div class="entry">
+          <label class="field">Fecha<input type="date" id="fDate" required></label>
+          <label class="field">Efectivo (caja)<input type="text" inputmode="numeric" id="fCash" placeholder="0" required autocomplete="off"></label>
+          <label class="field">En cuenta (virtual)<input type="text" inputmode="numeric" id="fVirtual" placeholder="0" required autocomplete="off"></label>
+          <label class="field">Gastos del día<input type="text" inputmode="numeric" id="fExpense" placeholder="0" autocomplete="off"></label>
+          <label class="field">Gastos: ¿cómo se pagó?<select id="fExpMethod"><option value="">— selecciona —</option><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="combinado">Combinado</option></select></label>
+          <label class="field" id="fExpCashWrap" style="display:none">Gasto en efectivo<input type="text" inputmode="numeric" id="fExpCash" placeholder="0" autocomplete="off"></label>
+          <label class="field" id="fExpCardWrap" style="display:none">Gasto en tarjeta<input type="text" inputmode="numeric" id="fExpCard" placeholder="0" autocomplete="off"></label>
+          <label class="field">¿A qué se pagó?<input id="fNote" placeholder="Insumos, servicios..."></label>
+          <label class="field debt">Se quedó debiendo (compartida 35/65)<input type="text" inputmode="numeric" id="fDebt" placeholder="0" autocomplete="off"></label>
+          <label class="field debt">¿Quién quedó debiendo?<input id="fDebtWho" placeholder="Juan, Andrés..." autocomplete="off"></label>
+          <label class="field" style="flex-direction:row;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="fDebtNet" style="width:auto;flex:none"> ¿Hay otra deuda donde el negocio recibe el 100%? (parqueadero, venta...)</label>
+          <label class="field debt netd" id="fDebtNetReasonWrap" style="display:none">¿Cuál fue? (motivo)<input id="fDebtNetReason" placeholder="Parqueadero, venta..." autocomplete="off"></label>
+          <label class="field debt netd" id="fDebtNetValueWrap" style="display:none">Valor (100% del negocio)<input type="text" inputmode="numeric" id="fDebtNetValue" placeholder="0" autocomplete="off"></label>
+          <label class="field debt netd" id="fDebtNetWhoWrap" style="display:none">¿Quién debe / a quién se le cobra?<input id="fDebtNetWho" placeholder="Nombre..." autocomplete="off"></label>
+          <label class="field"><span class="chk-row"><input type="checkbox" id="fMkt"> ¿Cliente agendado por marketing?</span></label>
+          <label class="field mkt-wrap" id="fMktWrap">Valor por marketing<input type="text" inputmode="numeric" id="fMktValue" placeholder="0" autocomplete="off"></label>
+        </div>
+
+        <div class="washers-block">
+          <div class="wash-head">
+            <span>Lavadores — ¿cuánto hizo cada uno?</span>
+            <span class="wash-check" id="washCheck"></span>
+            <button type="button" class="btn" id="addWasher">＋ Agregar lavador</button>
+          </div>
+          <div id="washersList"></div>
+        </div>
+
+        <div class="entry-actions">
+          <button class="btn primary" type="submit">Cerrar día</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Fecha</th>
+          <th class="num">Efectivo</th>
+          <th class="num">En cuenta</th>
+          <th class="num">Parqueadero</th>
+          <th class="num">Total del día</th>
+          <th class="num">Lavadores (<span class="cpct">35</span>%)</th>
+          <th class="num">Negocio (<span class="bpct">65</span>%)</th>
+          <th class="num">Gastos</th>
+          <th>Detalle</th>
+          <th class="num">Debe</th>
+          <th class="num">Utilidad neta</th>
+        </tr></thead>
+        <tbody id="dayBody"></tbody>
+        <tfoot id="dayFoot"></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- RESUMEN -->
+  <section class="view" id="resumen">
+    <div class="kpis">
+      <div class="kpi accent"><div class="lbl">Total generado</div><div class="val" id="kTotal">$0</div><div class="sub">lavados + parqueadero</div></div>
+      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pend. + cobros efectivo − gastos efectivo − vales efectivo</div></div>
+      <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">saldo real de la cuenta</div></div>
+      <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
+      <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
+      <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
+      <div class="kpi"><div class="lbl">Utilidad negocio</div><div class="val" id="kNet">$0</div><div class="sub">negocio - gastos</div></div>
+      <div class="kpi accent"><div class="lbl">Ingresos por marketing</div><div class="val" id="kMkt">$0</div><div class="sub">clientes agendados por marketing</div></div>
+    </div>
+
+    <h3 class="section-title" style="font-size:1rem;margin:0 0 12px">Estado de deudas</h3>
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Total sin deuda</div><div class="val" id="kNoDebt">$0</div><div class="sub">plata que tenemos hoy</div></div>
+      <div class="kpi green"><div class="lbl">Total con deuda</div><div class="val" id="kWithDebt">$0</div><div class="sub">si pagan todo</div></div>
+      <div class="kpi red"><div class="lbl">Nos falta (por cobrar)</div><div class="val" id="kDebt">$0</div><div class="sub">deudas no pagadas</div></div>
+      <div class="kpi green"><div class="lbl">Efectivo físico ahora</div><div class="val" id="kCashNow">$0</div><div class="sub">lo que hay en caja hoy (efectivo real − deudas por cobrar)</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card"><h3>Total generado por día</h3><div class="chart" id="chartDay"></div></div>
+      <div class="card"><h3>¿A dónde va la plata?</h3><div class="chart" id="chartSplit"></div></div>
+    </div>
+    <div class="card tall"><h3>Utilidad del negocio acumulada</h3><div class="chart" id="chartNet"></div></div>
+  </section>
+
+  <!-- LAVADORES -->
+  <section class="view" id="lavadores">
+    <div class="lav-head">
+      <div style="margin-right:auto">
+        <h2 class="section-title">Pago a lavadores</h2>
+        <p class="section-sub" style="margin:0">Cuánto se le debe pagar a cada lavador (su comisión del <span class="cpct">35</span>%). Cuando les pagues, usa el botón: el pendiente vuelve a cero, tus ganancias no cambian y queda el registro del pago.</p>
+      </div>
+      <button class="btn" onclick="openVale()">＄ Dar vale</button>
+      <button class="btn primary" onclick="payWashers()">✓ Ya pagué a los lavadores</button>
+      <button class="btn ghost" onclick="undoPay()" style="margin-left:8px">↩ Deshacer último pago</button>
+      <button class="btn ghost" onclick="resetPay()" style="margin-left:8px;color:var(--artifact-red);border-color:var(--artifact-red)">⟲ Resetear pagos</button>
+    </div>
+    <div class="kpis">
+      <div class="kpi amber"><div class="lbl">Por pagar ahora</div><div class="val" id="wPay">$0</div><div class="sub">neto (comisión − vales)</div></div>
+      <div class="kpi red"><div class="lbl">Vales pendientes</div><div class="val" id="wVale">$0</div><div class="sub">adelantos por descontar</div></div>
+      <div class="kpi green"><div class="lbl">Ya pagado (histórico)</div><div class="val" id="wPaidTot">$0</div><div class="sub">total pagado</div></div>
+      <div class="kpi teal"><div class="lbl">Pagado este mes</div><div class="val" id="wPaidMonth">$0</div><div class="sub">mes actual</div></div>
+    </div>
+    <div class="table-wrap" style="margin-bottom:24px">
+      <table>
+        <thead><tr><th>Lavador</th><th class="num">Produjo (total)</th><th class="num">%</th><th class="num">Comisión</th><th class="num">Vales</th><th class="num">Por pagar (neto)</th><th class="num">Ya pagado</th></tr></thead>
+        <tbody id="washBody"></tbody>
+        <tfoot id="washFoot"></tfoot>
+      </table>
+    </div>
+    <div class="grid-2">
+      <div class="card"><h3>Plata por pagar por lavador</h3><div class="chart" id="chartWash"></div></div>
+      <div class="card"><h3>Historial de pagos</h3>
+        <div class="table-wrap" style="max-height:340px">
+          <table>
+            <thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Total</th></tr></thead>
+            <tbody id="pagosBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="card"><h3>Vales entregados (adelantos)</h3>
+      <p class="section-sub" style="margin:0 0 12px">Cada vale se le RESTA al lavador de lo que hay que pagarle al cierre. Cuando marcas "Ya pagué a los lavadores", los vales pendientes quedan como descontados.</p>
+      <div class="table-wrap" style="max-height:340px">
+        <table>
+          <thead><tr><th>Fecha</th><th>Lavador</th><th class="num">Valor</th><th>Origen</th><th>Nota</th><th>Estado</th></tr></thead>
+          <tbody id="valesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer class="site-footer">
+  <div class="fdev">Desarrollado por</div>
+  <div class="fname">José Luis Rodríguez</div>
+  <div class="fline"></div>
+  <div class="fsub">Tu Lavado VIP · Contabilidad en la nube</div>
+</footer>
+
+<!-- MODAL PARQUEADERO -->
+<div class="modal-back" id="parkModal">
+  <div class="modal">
+    <h3>Registrar parqueadero</h3>
+    <p class="sub">Se suma al día indicado. Puedes registrar varias veces el mismo día. El % es lo que se llevan los lavadores (normalmente 0%).</p>
+    <form id="parkForm">
+      <label class="field">Fecha<input type="date" id="pDate" required></label>
+      <label class="field">Valor<input type="text" inputmode="numeric" id="pValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">% lavadores<input type="number" id="pPct" step="1" min="0" max="100" value="0"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closePark()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL ASIGNAR LAVADORES -->
+<div class="modal-back" id="assignModal">
+  <div class="modal">
+    <h3 id="assignTitle">Asignar lavadores</h3>
+    <p class="sub" id="assignTarget"></p>
+    <form id="assignForm">
+      <div id="assignWashersList"></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 2px">
+        <span class="wash-check" id="assignCheck"></span>
+        <button type="button" class="btn" id="assignAddWasher" style="margin-left:auto;padding:6px 11px;font-size:.78rem">＋ Agregar lavador</button>
+      </div>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeAssign()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar asignación</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL COBRAR DEUDA -->
+<div class="modal-back" id="cobroModal">
+  <div class="modal">
+    <h3>Cobrar deuda</h3>
+    <p class="sub">Registra un pago de una deuda pendiente y asígnalo a un día. Cuando la deuda de ese día llegue a cero, el día queda consolidado y desaparece la línea roja.</p>
+    <form id="cobroForm">
+      <label class="field">Día con deuda<select id="cDay" required></select></label>
+      <p class="sub" id="cInfo" style="margin:-4px 0 0"></p>
+      <label class="field">Valor cobrado<input type="text" inputmode="numeric" id="cValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">¿Quién pagó?<input id="cWho" placeholder="Juan..." autocomplete="off"></label>
+      <label class="field">¿Cómo pagó?<select id="cMethod"><option value="efectivo">Efectivo (caja)</option><option value="tarjeta">Tarjeta / cuenta (virtual)</option></select></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeCobro()">Cancelar</button>
+        <button type="submit" class="btn primary">Registrar cobro</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL CARGAR DEUDA -->
+<div class="modal-back" id="cargarModal">
+  <div class="modal">
+    <h3>Cargar deuda a un día</h3>
+    <p class="sub">Agrega una deuda pendiente a un día ya registrado. Mientras está pendiente, la deuda se cuenta en el efectivo; cuando la cobres (botón "Cobrar deuda") decides si entró en efectivo o tarjeta.</p>
+    <form id="cargarForm">
+      <label class="field">Día<select id="lDay" required></select></label>
+      <div class="cargar-info" id="lInfo"></div>
+      <label class="field">¿Qué % gana el negocio de esta deuda?<select id="lType">
+        <option value="shared" id="lOptShared">El negocio gana el 65% (compartida — lavadores 35%)</option>
+        <option value="net" id="lOptNet">El negocio gana el 100% (parqueadero, venta — sin comisión)</option>
+      </select></label>
+      <label class="field" id="lReasonWrap">¿A qué se debe? (motivo)<input id="lReason" placeholder="Parqueadero, venta..." autocomplete="off"></label>
+      <label class="field">Valor de la deuda<input type="text" inputmode="numeric" id="lValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">¿Quién debe?<input id="lWho" placeholder="Juan, Andrés..." autocomplete="off"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeCargar()">Cancelar</button>
+        <button type="submit" class="btn primary">Cargar deuda</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL DAR VALE -->
+<div class="modal-back" id="valeModal">
+  <div class="modal">
+    <h3>Dar vale a un lavador</h3>
+    <p class="sub">Un vale es un adelanto que le entregas a un lavador. Se le RESTA de lo que hay que pagarle al cierre. No cambia tus ganancias: esa plata ya era del lavador.</p>
+    <form id="valeForm">
+      <label class="field">Lavador<select id="vWasher" required></select></label>
+      <label class="field">Valor del vale<input type="text" inputmode="numeric" id="vValue" placeholder="0" required autocomplete="off"></label>
+      <label class="field">Fecha<input type="date" id="vDate" required></label>
+      <label class="field">¿De dónde salió la plata?<select id="vSource"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta (virtual)</option></select></label>
+      <label class="field">Nota (opcional)<input id="vNote" placeholder="Motivo..." autocomplete="off"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeVale()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar vale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL METODO DE GASTO (para gastos sin método asignado) -->
+<div class="modal-back" id="expModal">
+  <div class="modal">
+    <h3>¿Cómo se pagó este gasto?</h3>
+    <p class="sub" id="expInfo"></p>
+    <form id="expForm">
+      <label class="field">Método<select id="eMethod"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="combinado">Combinado</option></select></label>
+      <label class="field" id="eCashWrap" style="display:none">Gasto en efectivo<input type="text" inputmode="numeric" id="eCash" placeholder="0" autocomplete="off"></label>
+      <label class="field" id="eCardWrap" style="display:none">Gasto en tarjeta<input type="text" inputmode="numeric" id="eCard" placeholder="0" autocomplete="off"></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeExpMethod()">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL NOTAS -->
+<div class="modal-back" id="notasModal">
+  <div class="modal" style="max-width:520px">
+    <h3>🔔 Pendientes</h3>
+    <p class="sub">Pendientes / cosas por hacer para los administradores. Mientras haya al menos un pendiente sin leer, el botón de arriba se sacude 🔔 sin parar para que nadie se lo pierda. Todo queda guardado en la nube para revisarlo a fin de mes.</p>
+    <form id="notasForm">
+      <label class="field">Autor<input id="nAutor" placeholder="Tu nombre..." autocomplete="off"></label>
+      <label class="field">Nota<textarea id="nText" placeholder="Escribe la nota..."></textarea></label>
+      <div class="row">
+        <button type="button" class="btn ghost" onclick="closeNotas()">Cerrar</button>
+        <button type="button" class="btn primary" onclick="markNotesSeen()">✓ Ya lo leí (dejar de molestar)</button>
+        <button type="submit" class="btn">＋ Guardar pendiente</button>
+      </div>
+    </form>
+    <div style="margin-top:16px;max-height:320px;overflow:auto" id="notasList"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ================= FIREBASE ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCE-YpoFTjGiawfkNkRwMYjWnYSgWcnGTE",
+  authDomain: "tu-lavado-vip.firebaseapp.com",
+  projectId: "tu-lavado-vip",
+  storageBucket: "tu-lavado-vip.firebasestorage.app",
+  messagingSenderId: "807461747371",
+  appId: "1:807461747371:web:37bdbc9cb2fa2ed7d1d5ee",
+  measurementId: "G-X83M4DFXY1"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const COL_DAYS = "cierres";          // 1 documento por día, id = fecha (YYYY-MM-DD)
+const MAX_W = 5;                     // máximo de lavadores por día
+
+function setStatus(state, msg){
+  const el = document.getElementById("cloudStatus");
+  if(!el) return;
+  el.textContent = msg;
+  el.className = "cloud " + state;
+}
+
+/* ================= STATE ================= */
+const COP = new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
+const fmt = n => COP.format(Math.round(n||0));
+const sep = v => { const d=(''+v).replace(/\D/g,''); return d? (+d).toLocaleString('es-CO') : ''; };   // 1200000 -> "1.200.000"
+const numVal = el => +(''+el.value).replace(/\D/g,'')||0;                                              // "1.200.000" -> 1200000
+const digits = v => +(''+v).replace(/\D/g,'')||0;
+function attachSep(id){ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ el.value=sep(el.value); }); }
+['fCash','fVirtual','fExpense','fExpCash','fExpCard','fDebt','fDebtNetValue','fMktValue','pValue','cValue','vValue','eCash','eCard','lValue'].forEach(attachSep);
+let days = [];   // {id,date,cash,virtual,park,parkPct,expense,note,debt,debtWho,washers:[{name,amount}],commPct,closed}
+let commPct = 35;
+let loadedFromExisting = null;   // fecha cargada en el form para editar (evita duplicar cierres)
+let roster = ['Lavador 1','Lavador 2','Lavador 3'];  // lista fija de lavadores (persistida)
+let pagos = [];                                        // registros de pago a lavadores
+let cobros = [];                                       // registros de cobro de deudas
+let vales = [];                                        // adelantos (vales) entregados a lavadores
+let notas = [];                                        // notas de administradores (revisión fin de mes)
+let charts = {};
+
+/* ---------- per-day math ---------- */
+const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;  // cualquier valor (texto o número) -> número
+const wash  = d => num(d.cash)+num(d.virtual);
+const park  = d => num(d.park);
+const total = d => wash(d)+park(d);
+const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;  // lavadores
+const biz   = d => total(d)-comm(d);                                               // negocio
+const net   = d => biz(d)-num(d.expense);                                          // utilidad neta
+const debt  = d => num(d.debt);                                                    // deuda original registrada
+const mktVal = d => d.mkt ? num(d.mktValue) : 0;                                    // ingreso atribuido a marketing ese día
+/* --- gastos por método (para descontar de la caja/cuenta correcta). Gasto antiguo sin método -> pendiente, no se descuenta hasta asignarlo. */
+const expCashOf = d => { const m=d.expMethod, e=num(d.expense); if(m==='efectivo')return e; if(m==='tarjeta')return 0; if(m==='combinado')return num(d.expCash); return 0; };
+const expCardOf = d => { const m=d.expMethod, e=num(d.expense); if(m==='tarjeta')return e; if(m==='combinado')return num(d.expCard); return 0; };
+const expUnknown = d => num(d.expense)>0 && !d.expMethod;
+/* --- dos buckets de deuda por dia --- 
+   Compartida (35/65): debt/debtWho/debtPaid.  Neta 100% negocio: debtNet/debtNetWho/debtNetReason/debtNetPaid.
+   Legacy: dias con debtShared===false guardaban su valor en debt/debtPaid -> se leen como deuda neta. */
+const shTot   = d => (d.debtShared===false)? 0 : num(d.debt);
+const shPaid  = d => (d.debtShared===false)? 0 : num(d.debtPaid);
+const ntTot   = d => (d.debtShared===false)? num(d.debt) : num(d.debtNet);
+const ntPaid  = d => (d.debtShared===false)? num(d.debtPaid) : num(d.debtNetPaid);
+const sharedOut = d => Math.max(0, shTot(d)-shPaid(d));                             // deuda compartida pendiente
+const netOut    = d => Math.max(0, ntTot(d)-ntPaid(d));                             // deuda 100% negocio pendiente
+const debtOut = d => sharedOut(d)+netOut(d);                                        // deuda total pendiente
+const ntWho   = d => (d.debtShared===false)? (d.debtWho||'') : (d.debtNetWho||'');
+const ntReason= d => (d.debtShared===false)? (d.debtReason||'') : (d.debtNetReason||'');
+/* un cobro pertenece al bucket neto? (legacy: por el tipo del dia) */
+function cobroIsNet(c){ if(c.bucket) return c.bucket==='net'; const d=days.find(x=>x.date===c.dayDate); return !!(d && d.debtShared===false); }
+/* suma de cobros de deudas 100% negocio ya cobradas: son ganancia neta */
+function collectedNonShared(){ return cobros.reduce((a,c)=>a+(cobroIsNet(c)?num(c.amount):0),0); }
+const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
+const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
+
+/* ---------- Firestore writes ---------- */
+async function closeDay(d){
+  await setDoc(doc(db, COL_DAYS, d.date), {
+    date:d.date, cash:d.cash, virtual:d.virtual, expense:d.expense,
+    expMethod:d.expMethod||'', expCash:d.expCash||0, expCard:d.expCard||0,
+    note:d.note, debt:d.debt||0, debtWho:d.debtWho||'',
+    debtShared:true, debtNet:d.debtNet||0, debtNetWho:d.debtNetWho||'', debtNetReason:d.debtNetReason||'',
+    mkt:!!d.mkt, mktValue:d.mktValue||0,
+    washers:d.washers||[],
+    commPct:d.commPct, closed:true, updatedAt:Date.now()
+  }, { merge:true });
+}
+async function addPark(date, value, pct){
+  const ex = days.find(d=>d.date===date);
+  await setDoc(doc(db, COL_DAYS, date), {
+    date, park:((ex&&ex.park)||0)+value, parkPct:pct, updatedAt:Date.now()
+  }, { merge:true });
+}
+async function saveCfg(){ await setDoc(doc(db, "config", "general"), {commPct}); }
+async function saveRoster(){ try{ await setDoc(doc(db, "config", "lavadores"), {names:roster}); }catch(e){} }
+function currentMonth(){ return new Date().toISOString().slice(0,7); }
+
+/* ---------- Firestore realtime listeners ---------- */
+onSnapshot(collection(db, COL_DAYS),
+  snap => {
+    days = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    setStatus("on", "Conectado");
+    renderAll();
+    if(typeof maybeRunFix==="function") maybeRunFix();
+  },
+  err => { setStatus("off", "Sin conexión (" + err.code + ")"); }
+);
+onSnapshot(doc(db, "config", "general"),
+  snap => {
+    if (snap.exists()){
+      const saved = +snap.data().commPct;
+      // El default siempre es 35%. Un 0/valor invalido guardado no debe pisar el default.
+      commPct = (Number.isFinite(saved) && saved > 0) ? saved : 35;
+      commInput.value = commPct;
+      refreshPctLabels();
+      renderAll();
+    }
+  },
+  () => {}
+);
+/* lista fija de lavadores */
+onSnapshot(doc(db, "config", "lavadores"),
+  snap => {
+    if (snap.exists() && Array.isArray(snap.data().names) && snap.data().names.length){
+      roster = snap.data().names.slice(0, MAX_W);
+      if (isFreshForm()) initWashers();   // si el formulario está en blanco, recarga los nombres fijos
+    }
+  },
+  () => {}
+);
+/* registros de pago a lavadores */
+onSnapshot(collection(db, "pagos"),
+  snap => {
+    pagos = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    renderWashersDash();
+    if (document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+  },
+  () => {}
+);
+/* registros de cobro de deudas */
+onSnapshot(collection(db, "cobros"),
+  snap => { cobros = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderAll(); },
+  () => {}
+);
+/* registros de vales (adelantos a lavadores) */
+onSnapshot(collection(db, "vales"),
+  snap => {
+    vales = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    valesLoaded = true;
+    renderWashersDash();
+    if (document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+    if(typeof maybeRunFix==="function") maybeRunFix();
+  },
+  () => {}
+);
+/* notas de administradores */
+onSnapshot(collection(db, "notas"),
+  snap => { notas = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderNotasBadge(); if(document.getElementById('notasModal').classList.contains('open')) renderNotas(); },
+  () => {}
+);
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); document.getElementById(t.dataset.view).classList.add('active');
+  if(t.dataset.view==='resumen') setTimeout(renderCharts,50);
+  if(t.dataset.view==='lavadores'){ renderWashersDash(); setTimeout(renderWashChart,50); }
+});
+
+/* ---------- settings ---------- */
+const commInput=document.getElementById('commPct');
+commInput.value=commPct;
+function refreshPctLabels(){
+  document.getElementById('bizPctLbl').textContent=(100-commPct)+'%';
+  document.querySelectorAll('.cpct').forEach(e=>e.textContent=commPct);
+  document.querySelectorAll('.bpct').forEach(e=>e.textContent=100-commPct);
+}
+commInput.onchange=()=>{ commPct=Math.min(100,Math.max(0,+commInput.value||0)); refreshPctLabels(); renderAll(); saveCfg(); };
+
+/* ================= LAVADORES (formulario) ================= */
+const washersList=document.getElementById('washersList');
+function washerRowHTML(name,amount){
+  return `<div class="wash-row">
+    <input class="w-name" placeholder="Nombre del lavador" value="${(name||'').replace(/"/g,'&quot;')}">
+    <input class="w-amt" inputmode="numeric" placeholder="0" value="${amount!=null&&amount!==''?sep(amount):''}">
+    <button type="button" class="btn ghost w-del" title="Quitar">✕</button>
+  </div>`;
+}
+function washerRows(){ return [...washersList.querySelectorAll('.wash-row')]; }
+function bindWasherRow(row){
+  const amt=row.querySelector('.w-amt');
+  amt.addEventListener('input',()=>{ amt.value=sep(amt.value); updateWashCheck(); });
+  row.querySelector('.w-name').addEventListener('change', syncRosterFromForm);
+  row.querySelector('.w-del').onclick=()=>{ if(washerRows().length<=1){ alert('Debe quedar al menos un lavador.'); return; } row.remove(); updateWashCheck(); syncRosterFromForm(); };
+}
+/* Guarda en Firebase la lista fija de lavadores (nombres actuales del formulario). */
+function syncRosterFromForm(){
+  const names=washerRows().map(r=>r.querySelector('.w-name').value.trim()).filter(Boolean);
+  if(names.length){ roster=names.slice(0,MAX_W); saveRoster(); }
+}
+/* True si el formulario está en blanco y la fecha no tiene registro (para recargar nombres fijos). */
+function isFreshForm(){
+  const ex=days.find(d=>d.date===fDate.value);
+  if(ex) return false;
+  return washersSum()===0 && numVal(fCash)===0 && numVal(fVirtual)===0;
+}
+function addWasherRow(name,amount){
+  if(washerRows().length>=MAX_W){ alert('Por ahora el máximo es '+MAX_W+' lavadores.'); return; }
+  washersList.insertAdjacentHTML('beforeend', washerRowHTML(name!=null?name:('Lavador '+(washerRows().length+1)), amount));
+  bindWasherRow(washersList.lastElementChild);
+}
+function initWashers(list){
+  washersList.innerHTML='';
+  const arr=(Array.isArray(list)&&list.length)?list:roster.map(n=>({name:n}));
+  arr.slice(0,MAX_W).forEach(w=>addWasherRow(w.name, w.amount));
+  updateWashCheck();
+}
+function readWashers(){
+  return washerRows().map(r=>({name:r.querySelector('.w-name').value.trim(), amount:digits(r.querySelector('.w-amt').value)}))
+                     .filter(w=>w.name||w.amount);
+}
+function washersSum(){ return washerRows().reduce((a,r)=>a+digits(r.querySelector('.w-amt').value),0); }
+function updateWashCheck(){
+  const el=document.getElementById('washCheck'); if(!el) return;
+  const target=numVal(fCash)+numVal(fVirtual);
+  const s=washersSum(), diff=target-s;
+  if(target===0 && s===0){ el.textContent=''; el.className='wash-check'; return; }
+  if(diff===0){ el.textContent='✓ Cuadra con efectivo + cuenta ('+fmt(s)+')'; el.className='wash-check ok'; }
+  else { el.textContent=(diff>0?'Faltan por asignar ':'Sobran ')+fmt(Math.abs(diff))+' — asignado '+fmt(s)+' de '+fmt(target); el.className='wash-check bad'; }
+}
+document.getElementById('addWasher').onclick=()=>{ addWasherRow(); syncRosterFromForm(); };
+['fCash','fVirtual'].forEach(id=>document.getElementById(id).addEventListener('input',updateWashCheck));
+
+/* ---------- marketing: mostrar/ocultar el valor según el checkbox ---------- */
+function toggleMkt(){ document.getElementById('fMktWrap').classList.toggle('show', document.getElementById('fMkt').checked); }
+document.getElementById('fMkt').addEventListener('change',toggleMkt);
+/* ---------- deuda 100% negocio: mostrar campos motivo/valor/quien cuando esta marcada ---------- */
+function toggleDebtNet(){ const on=document.getElementById('fDebtNet').checked; ['fDebtNetReasonWrap','fDebtNetValueWrap','fDebtNetWhoWrap'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=on?'flex':'none';}); }
+document.getElementById('fDebtNet').addEventListener('change',toggleDebtNet);
+function toggleExpMethod(){ const comb=document.getElementById('fExpMethod').value==='combinado'; document.getElementById('fExpCashWrap').style.display=comb?'flex':'none'; document.getElementById('fExpCardWrap').style.display=comb?'flex':'none'; }
+document.getElementById('fExpMethod').addEventListener('change',toggleExpMethod);
+
+/* ---------- form cierre ---------- */
+document.getElementById('fDate').valueAsDate=new Date();
+/* Si el día seleccionado quedó en validación (con deuda), precargamos sus datos para poder cerrarlo. */
+document.getElementById('fDate').addEventListener('change',()=>{
+  const ex=days.find(d=>d.date===fDate.value);
+  loadedFromExisting=null;
+  if(ex){
+    // Día ya registrado: precargamos todo para VER lo que se guardó (el cierre no se puede repetir).
+    fCash.value=sep(ex.cash||0); fVirtual.value=sep(ex.virtual||0);
+    fExpense.value=sep(ex.expense||0); fNote.value=ex.note||'';
+    document.getElementById('fExpMethod').value=ex.expMethod||''; fExpCash.value=ex.expCash?sep(ex.expCash):''; fExpCard.value=ex.expCard?sep(ex.expCard):''; toggleExpMethod();
+    const legacyNet=ex.debtShared===false;
+    fDebt.value=sep(legacyNet?0:(ex.debt||0)); fDebtWho.value=legacyNet?'':(ex.debtWho||'');
+    const nAmt=legacyNet?num(ex.debt):num(ex.debtNet);
+    document.getElementById('fDebtNet').checked=nAmt>0;
+    fDebtNetValue.value=nAmt?sep(nAmt):''; fDebtNetReason.value=ntReason(ex); fDebtNetWho.value=ntWho(ex); toggleDebtNet();
+    document.getElementById('fMkt').checked=!!ex.mkt; fMktValue.value=ex.mktValue?sep(ex.mktValue):''; toggleMkt();
+    initWashers(ex.washers);
+    updateWashCheck();
+    loadedFromExisting=fDate.value;   // marcamos que este día se cargó para editar (no es duplicado)
+  }
+});
+document.getElementById('entryForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(!fDate.value){ alert('Selecciona una fecha.'); return; }
+  const ex = days.find(d=>d.date===fDate.value);
+  // Un día se cierra UNA sola vez: si ya existe un cierre para esa fecha, no se puede volver a cerrar ni modificar.
+  if(ex && ex.closed){
+    alert('El día '+fDate.value+' ya tiene un cierre registrado.\n\nUn día solo se cierra UNA vez: no se puede volver a cerrar ni modificar. Estás viendo la información que quedó guardada ese día.\n\nSi necesitas hacer algún cambio, habla con el administrador y creador de este software: José Luis Rodríguez.');
+    return;
+  }
+  const washers=readWashers();
+  const sumW=washers.reduce((a,w)=>a+w.amount,0);
+  const target=numVal(fCash)+numVal(fVirtual);
+  if(target>0 && sumW!==target){
+    alert('Debes asignar cuánto hizo cada lavador.\n\nLa suma de los lavadores ('+fmt(sumW)+') tiene que ser exactamente igual a efectivo + cuenta ('+fmt(target)+').');
+    return;
+  }
+  const mktOn=document.getElementById('fMkt').checked;
+  if(mktOn && numVal(fMktValue)<=0){ alert('Marcaste que hubo cliente por marketing. Escribe el valor de marketing.'); return; }
+  const netOn=document.getElementById('fDebtNet').checked;
+  if(netOn && numVal(fDebtNetValue)<=0){ alert('Marcaste que hay una deuda 100% del negocio. Escribe el valor de esa deuda.'); return; }
+  const expTot=numVal(fExpense);
+  const expM=document.getElementById('fExpMethod').value;
+  let expCash=0, expCard=0;
+  if(expTot>0){
+    if(!expM){ alert('Indica cómo se pagaron los gastos del día: efectivo, tarjeta o combinado.'); return; }
+    if(expM==='efectivo'){ expCash=expTot; }
+    else if(expM==='tarjeta'){ expCard=expTot; }
+    else { expCash=numVal(fExpCash); expCard=numVal(fExpCard); if(expCash+expCard!==expTot){ alert('El gasto combinado no cuadra.\n\nEfectivo ('+fmt(expCash)+') + Tarjeta ('+fmt(expCard)+') debe ser exactamente igual al gasto total ('+fmt(expTot)+').'); return; } }
+  }
+  const rec={date:fDate.value,cash:numVal(fCash),virtual:numVal(fVirtual),
+    expense:numVal(fExpense),expMethod:expTot>0?expM:'',expCash:expCash,expCard:expCard,note:fNote.value.trim(),
+    debt:numVal(fDebt),debtWho:fDebtWho.value.trim(),
+    debtShared:true,
+    debtNet:netOn?numVal(fDebtNetValue):0, debtNetWho:netOn?fDebtNetWho.value.trim():'', debtNetReason:netOn?fDebtNetReason.value.trim():'',
+    mkt:mktOn, mktValue:mktOn?numVal(fMktValue):0,
+    washers, commPct:commPct};
+  try{
+    await closeDay(rec);
+    syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
+    fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
+    document.getElementById('fExpMethod').value=''; fExpCash.value=''; fExpCard.value=''; toggleExpMethod();
+    document.getElementById('fDebtNet').checked=false; fDebtNetValue.value=''; fDebtNetReason.value=''; fDebtNetWho.value=''; toggleDebtNet();
+    document.getElementById('fMkt').checked=false; fMktValue.value=''; toggleMkt();
+    loadedFromExisting=null;
+    initWashers();
+  }catch(err){ alert('No se pudo guardar en la nube: '+err.message); }
+};
+
+/* ---------- modal parqueadero ---------- */
+function openPark(){ document.getElementById('pDate').valueAsDate=new Date(); document.getElementById('parkModal').classList.add('open'); }
+function closePark(){ document.getElementById('parkModal').classList.remove('open'); }
+document.getElementById('parkModal').addEventListener('click',e=>{ if(e.target.id==='parkModal') closePark(); });
+document.getElementById('parkForm').onsubmit=async e=>{
+  e.preventDefault();
+  const date=pDate.value; if(!date){ alert('Selecciona una fecha.'); return; }
+  const val=numVal(pValue);
+  const pct=Math.min(100,Math.max(0,+pPct.value||0));
+  try{
+    await addPark(date, val, pct);
+    pValue.value=''; pPct.value='0'; closePark();
+  }catch(err){ alert('No se pudo guardar el parqueadero: '+err.message); }
+};
+
+/* ---------- modal ASIGNAR LAVADORES (para días ya cerrados sin desglose) ---------- */
+let assignDate=null;
+const assignList=document.getElementById('assignWashersList');
+function assignRows(){ return [...assignList.querySelectorAll('.wash-row')]; }
+function assignSum(){ return assignRows().reduce((a,r)=>a+digits(r.querySelector('.w-amt').value),0); }
+function updateAssignCheck(){
+  const el=document.getElementById('assignCheck'); if(!el) return;
+  const d=days.find(x=>x.date===assignDate); const target=d?wash(d):0;
+  const s=assignSum(), diff=target-s;
+  if(diff===0 && target>0){ el.textContent='✓ Cuadra con efectivo + cuenta ('+fmt(s)+')'; el.className='wash-check ok'; }
+  else { el.textContent=(diff>0?'Faltan por asignar ':'Sobran ')+fmt(Math.abs(diff))+' — asignado '+fmt(s)+' de '+fmt(target); el.className='wash-check bad'; }
+}
+function assignAddRow(name,amount){
+  if(assignRows().length>=MAX_W){ alert('Por ahora el máximo es '+MAX_W+' lavadores.'); return; }
+  assignList.insertAdjacentHTML('beforeend', washerRowHTML(name!=null?name:('Lavador '+(assignRows().length+1)), amount));
+  const row=assignList.lastElementChild;
+  const amt=row.querySelector('.w-amt');
+  amt.addEventListener('input',()=>{ amt.value=sep(amt.value); updateAssignCheck(); });
+  row.querySelector('.w-del').onclick=()=>{ if(assignRows().length<=1){ alert('Debe quedar al menos un lavador.'); return; } row.remove(); updateAssignCheck(); };
+}
+function assignWashers(date){
+  const d=days.find(x=>x.date===date);
+  if(!d){ alert('Día no encontrado.'); return; }
+  if(hasWashers(d)){ alert('Este día ya tiene los lavadores asignados y no se puede volver a editar.'); return; }
+  assignDate=date;
+  document.getElementById('assignTitle').textContent='Asignar lavadores — '+date;
+  document.getElementById('assignTarget').textContent='La suma debe cuadrar con efectivo + cuenta de ese día: '+fmt(wash(d))+'.';
+  assignList.innerHTML='';
+  roster.slice(0,MAX_W).forEach(n=>assignAddRow(n));
+  updateAssignCheck();
+  document.getElementById('assignModal').classList.add('open');
+}
+function closeAssign(){ document.getElementById('assignModal').classList.remove('open'); assignDate=null; }
+document.getElementById('assignAddWasher').onclick=()=>assignAddRow();
+document.getElementById('assignModal').addEventListener('click',e=>{ if(e.target.id==='assignModal') closeAssign(); });
+document.getElementById('assignForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===assignDate); if(!d){ closeAssign(); return; }
+  const washers=assignRows().map(r=>({name:r.querySelector('.w-name').value.trim(), amount:digits(r.querySelector('.w-amt').value)})).filter(w=>w.name||w.amount);
+  const sumW=washers.reduce((a,w)=>a+w.amount,0);
+  const target=wash(d);
+  if(sumW!==target){
+    alert('No se puede guardar.\n\nLa suma de los lavadores ('+fmt(sumW)+') tiene que ser exactamente igual a efectivo + cuenta de ese día ('+fmt(target)+').');
+    return;
+  }
+  try{
+    await setDoc(doc(db,COL_DAYS,d.date),{washers,updatedAt:Date.now()},{merge:true});
+    closeAssign();   // al guardar, el letrero desaparece y el día queda bloqueado
+  }catch(err){ alert('No se pudo guardar: '+err.message); }
+};
+window.assignWashers=assignWashers;
+window.closeAssign=closeAssign;
+
+/* ---------- modal COBRAR DEUDA ---------- */
+function debtEntries(){
+  const out=[];
+  [...days].sort((a,b)=>a.date.localeCompare(b.date)).forEach(d=>{
+    if(sharedOut(d)>0) out.push({date:d.date,bucket:'shared',amount:sharedOut(d)});
+    if(netOut(d)>0)    out.push({date:d.date,bucket:'net',amount:netOut(d)});
+  });
+  return out;
+}
+function curCobro(){ const [date,bucket]=(document.getElementById('cDay').value||'').split('|'); return {d:days.find(x=>x.date===date),bucket:bucket||'shared'}; }
+function openCobro(preDate,preBucket){
+  const list=debtEntries();
+  if(!list.length){ alert('No hay deudas pendientes por cobrar. Todos los días están consolidados.'); return; }
+  const sel=document.getElementById('cDay');
+  sel.innerHTML=list.map(e=>`<option value="${e.date}|${e.bucket}">${e.date} — ${e.bucket==='net'?'100% negocio':'compartida'}: debe ${fmt(e.amount)}</option>`).join('');
+  if(preDate){ const v=preDate+'|'+(preBucket||'shared'); if(list.some(e=>e.date+'|'+e.bucket===v)) sel.value=v; }
+  cValue.value=''; cWho.value='';
+  updateCobroInfo();
+  document.getElementById('cobroModal').classList.add('open');
+}
+function updateCobroInfo(){
+  const {d,bucket}=curCobro();
+  if(!d){ document.getElementById('cInfo').textContent=''; return; }
+  const out=bucket==='net'?netOut(d):sharedOut(d);
+  const who=bucket==='net'?ntWho(d):(d.debtWho||'');
+  const reason=bucket==='net'?ntReason(d):'';
+  document.getElementById('cInfo').textContent='Deuda pendiente ('+(bucket==='net'?'100% del negocio — sin comisión':'compartida — negocio '+(100-commPct)+'%')+'): '+fmt(out)+(reason?' — '+reason:'')+(who?' · '+who:'');
+}
+function closeCobro(){ document.getElementById('cobroModal').classList.remove('open'); }
+document.getElementById('cDay').addEventListener('change',updateCobroInfo);
+document.getElementById('cobroModal').addEventListener('click',e=>{ if(e.target.id==='cobroModal') closeCobro(); });
+document.getElementById('cobroForm').onsubmit=async e=>{
+  e.preventDefault();
+  const {d,bucket}=curCobro(); if(!d){ closeCobro(); return; }
+  const val=numVal(cValue), out=bucket==='net'?netOut(d):sharedOut(d);
+  if(val<=0){ alert('Ingresa el valor cobrado.'); return; }
+  if(val>out){ alert('No puedes cobrar más de lo que deben.\n\nDeuda pendiente: '+fmt(out)+'.'); return; }
+  try{
+    const method=(document.getElementById('cMethod').value==='tarjeta')?'tarjeta':'efectivo';
+    if(bucket==='net'){
+      const legacy=d.debtShared===false;
+      const field=legacy?'debtPaid':'debtNetPaid';
+      const cur=legacy?num(d.debtPaid):num(d.debtNetPaid);
+      await setDoc(doc(db,COL_DAYS,d.date),{[field]:cur+val,updatedAt:Date.now()},{merge:true});
+    } else {
+      await setDoc(doc(db,COL_DAYS,d.date),{debtPaid:num(d.debtPaid)+val,updatedAt:Date.now()},{merge:true});
+    }
+    await addDoc(collection(db,'cobros'),{dayDate:d.date,bucket:bucket,amount:val,who:cWho.value.trim(),method:method,paidAt:new Date().toISOString().slice(0,10),createdAt:Date.now()});
+    closeCobro();
+  }catch(err){ alert('No se pudo registrar el cobro: '+err.message); }
+};
+window.openCobro=openCobro; window.closeCobro=closeCobro;
+
+/* ---------- CARGAR DEUDA (agregar una deuda a un día) ---------- */
+function joinWho(a,b){ return [a,b].map(x=>(x||'').trim()).filter(Boolean).join(', '); }
+function openCargar(){
+  const list=[...days].sort((a,b)=>b.date.localeCompare(a.date));
+  if(!list.length){ alert('Primero registra al menos un día en el cierre.'); return; }
+  const sel=document.getElementById('lDay');
+  sel.innerHTML=list.map(d=>`<option value="${d.date}">${d.date}${debtOut(d)>0?' — ya debe '+fmt(debtOut(d)):''}</option>`).join('');
+  lValue.value=''; lWho.value=''; lReason.value='';
+  const bp=100-commPct;
+  const os=document.getElementById('lOptShared'); if(os) os.textContent='El negocio gana el '+bp+'% (compartida — lavadores '+commPct+'%)';
+  document.getElementById('lType').value='shared';
+  updateCargarUI();
+  document.getElementById('cargarModal').classList.add('open');
+}
+function updateCargarUI(){
+  const isNet=document.getElementById('lType').value==='net';
+  document.getElementById('lReasonWrap').style.display=isNet?'':'none';
+  const d=days.find(x=>x.date===lDay.value);
+  const el=document.getElementById('lInfo');
+  if(!d){ el.innerHTML='<span class="ci-title">Deuda actual del día</span>Selecciona un día.'; return; }
+  const sh=sharedOut(d), nt=netOut(d), tot=sh+nt;
+  el.innerHTML='<span class="ci-title">Deuda actual del día '+d.date+'</span>'+
+    (tot>0
+      ? 'Compartida (65/35): <b class="ci-sh">'+fmt(sh)+'</b><br>100% negocio: <b class="ci-nt">'+fmt(nt)+'</b>'
+      : 'Este día no tiene deuda pendiente. La nueva deuda quedará <b>en validación</b> hasta que la cobres.');
+}
+function closeCargar(){ document.getElementById('cargarModal').classList.remove('open'); }
+document.getElementById('lType').addEventListener('change',updateCargarUI);
+document.getElementById('lDay').addEventListener('change',updateCargarUI);
+document.getElementById('cargarModal').addEventListener('click',e=>{ if(e.target.id==='cargarModal') closeCargar(); });
+document.getElementById('cargarForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===lDay.value); if(!d){ closeCargar(); return; }
+  const val=numVal(lValue); if(val<=0){ alert('Ingresa el valor de la deuda.'); return; }
+  const bucket=document.getElementById('lType').value==='net'?'net':'shared';
+  const who=lWho.value.trim(), reason=lReason.value.trim();
+  // Normalizamos el día (arregla días legacy) y sumamos al bucket elegido, respetando lo ya cobrado.
+  const curShTot=shTot(d), curShPaid=shPaid(d), curShWho=(d.debtShared===false)?'':(d.debtWho||'');
+  const curNtTot=ntTot(d), curNtPaid=ntPaid(d), curNtWho=ntWho(d), curNtReason=ntReason(d);
+  const payload={
+    debtShared:true,
+    debt: curShTot + (bucket==='shared'?val:0),
+    debtPaid: curShPaid,
+    debtWho: bucket==='shared'? joinWho(curShWho,who) : curShWho,
+    debtNet: curNtTot + (bucket==='net'?val:0),
+    debtNetPaid: curNtPaid,
+    debtNetWho: bucket==='net'? joinWho(curNtWho,who) : curNtWho,
+    debtNetReason: bucket==='net'? (reason||curNtReason) : curNtReason,
+    updatedAt:Date.now()
+  };
+  try{
+    await setDoc(doc(db,COL_DAYS,d.date), payload, {merge:true});
+    closeCargar();
+    alert('Deuda cargada: '+fmt(val)+(bucket==='net'?' (100% del negocio)':' (negocio '+(100-commPct)+'% / lavadores '+commPct+'%)')+' al día '+d.date+'.');
+  }catch(err){ alert('No se pudo cargar la deuda: '+err.message); }
+};
+window.openCargar=openCargar; window.closeCargar=closeCargar;
+
+/* ---------- gastos: método de pago (efectivo/tarjeta/combinado) ---------- */
+function expenseCellHTML(d){
+  const e=num(d.expense); if(e<=0) return fmt(0);
+  if(expUnknown(d)) return fmt(e)+'<button type="button" class="mini-btn" onclick="openExpMethod(\''+d.date+'\')">¿tarjeta o efectivo?</button>';
+  const m=d.expMethod;
+  const tag = (m==='combinado') ? ('<span class="debt-who">ef '+fmt(num(d.expCash))+' · tj '+fmt(num(d.expCard))+'</span>')
+            : ('<span class="debt-who">'+(m==='tarjeta'?'tarjeta':'efectivo')+'</span>');
+  return fmt(e)+tag;
+}
+let expAssignDate=null;
+function openExpMethod(date){
+  const d=days.find(x=>x.date===date); if(!d) return;
+  expAssignDate=date;
+  document.getElementById('expInfo').textContent='Día '+date+' · gasto de '+fmt(num(d.expense))+'. Indica cómo se pagó para cuadrar la caja.';
+  eMethod.value='efectivo'; eCash.value=''; eCard.value=''; toggleExpModal();
+  document.getElementById('expModal').classList.add('open');
+}
+function closeExpMethod(){ document.getElementById('expModal').classList.remove('open'); expAssignDate=null; }
+function toggleExpModal(){ const comb=eMethod.value==='combinado'; document.getElementById('eCashWrap').style.display=comb?'flex':'none'; document.getElementById('eCardWrap').style.display=comb?'flex':'none'; }
+document.getElementById('eMethod').addEventListener('change',toggleExpModal);
+document.getElementById('expModal').addEventListener('click',e=>{ if(e.target.id==='expModal') closeExpMethod(); });
+document.getElementById('expForm').onsubmit=async e=>{
+  e.preventDefault();
+  const d=days.find(x=>x.date===expAssignDate); if(!d){ closeExpMethod(); return; }
+  const tot=num(d.expense), m=eMethod.value; let ec=0,ed=0;
+  if(m==='efectivo') ec=tot; else if(m==='tarjeta') ed=tot;
+  else { ec=numVal(eCash); ed=numVal(eCard); if(ec+ed!==tot){ alert('El gasto combinado no cuadra.\n\nEfectivo ('+fmt(ec)+') + Tarjeta ('+fmt(ed)+') debe ser igual al gasto ('+fmt(tot)+').'); return; } }
+  try{ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:m,expCash:ec,expCard:ed,updatedAt:Date.now()},{merge:true}); closeExpMethod(); }
+  catch(err){ alert('No se pudo guardar: '+err.message); }
+};
+window.openExpMethod=openExpMethod; window.closeExpMethod=closeExpMethod;
+
+/* ---------- vales (adelantos a lavadores) ---------- */
+function washerOptions(){
+  const set=new Set(roster.map(n=>(n||'').trim()).filter(Boolean));
+  days.forEach(d=>{ if(Array.isArray(d.washers)) d.washers.forEach(w=>{ const n=(w.name||'').trim(); if(n) set.add(n); }); });
+  return [...set];
+}
+function openVale(){
+  const sel=document.getElementById('vWasher');
+  sel.innerHTML=washerOptions().map(n=>`<option value="${n}">${n}</option>`).join('');
+  document.getElementById('vDate').valueAsDate=new Date();
+  vValue.value=''; vNote.value=''; document.getElementById('vSource').value='efectivo';
+  document.getElementById('valeModal').classList.add('open');
+}
+function closeVale(){ document.getElementById('valeModal').classList.remove('open'); }
+document.getElementById('valeModal').addEventListener('click',e=>{ if(e.target.id==='valeModal') closeVale(); });
+document.getElementById('valeForm').onsubmit=async e=>{
+  e.preventDefault();
+  const washer=(vWasher.value||'').trim();
+  const val=numVal(vValue);
+  if(!washer){ alert('Selecciona un lavador.'); return; }
+  if(val<=0){ alert('Ingresa el valor del vale.'); return; }
+  try{
+    const source=(document.getElementById('vSource').value==='virtual')?'virtual':'efectivo';
+    await addDoc(collection(db,'vales'),{washer,amount:val,note:vNote.value.trim(),source:source,valeAt:vDate.value||new Date().toISOString().slice(0,10),paid:false,valePaidAt:'',createdAt:Date.now()});
+    closeVale();
+  }catch(err){ alert('No se pudo guardar el vale: '+err.message); }
+};
+window.openVale=openVale; window.closeVale=closeVale;
+
+/* ================= NOTAS (administradores) ================= */
+function unseenNotas(){ return notas.filter(n=>!n.seen).length; }
+function renderNotasBadge(){
+  const dot=document.getElementById('notasDot'), btn=document.getElementById('btnNotas');
+  if(!dot||!btn) return;
+  const n=unseenNotas();
+  if(n>0){ dot.style.display='flex'; dot.textContent=n; btn.classList.add('hasnew'); }
+  else { dot.style.display='none'; btn.classList.remove('hasnew'); }
+}
+function openNotas(){ document.getElementById('notasModal').classList.add('open'); renderNotas(); }
+function closeNotas(){ document.getElementById('notasModal').classList.remove('open'); }
+document.getElementById('notasModal').addEventListener('click',e=>{ if(e.target.id==='notasModal') closeNotas(); });
+function renderNotas(){
+  const box=document.getElementById('notasList');
+  const list=[...notas].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  box.innerHTML = list.length ? list.map(n=>{
+    const f=(n.at||'')+(n.at&&n.autor?' · ':'')+(n.autor||'');
+    return `<div class="note-item ${n.seen?'':'new'}">
+      <div class="meta"><span>${f||'—'}</span>${n.seen?'':'<span class="badge-val">nueva</span>'}</div>
+      <div class="txt">${(n.text||'').replace(/</g,'&lt;')}</div></div>`;
+  }).join('') : '<div class="empty">No hay pendientes. Escribe el primero arriba.</div>';
+}
+document.getElementById('notasForm').onsubmit=async e=>{
+  e.preventDefault();
+  const text=document.getElementById('nText').value.trim();
+  if(!text){ alert('Escribe el pendiente.'); return; }
+  try{
+    await addDoc(collection(db,'notas'),{text,autor:document.getElementById('nAutor').value.trim(),at:new Date().toISOString().slice(0,10),seen:false,createdAt:Date.now()});
+    document.getElementById('nText').value='';
+  }catch(err){ alert('No se pudo guardar la nota: '+err.message); }
+};
+async function markNotesSeen(){
+  const pend=notas.filter(n=>!n.seen);
+  if(!pend.length){ alert('No hay pendientes nuevos por leer.'); return; }
+  try{ for(const n of pend){ await setDoc(doc(db,'notas',n.id),{seen:true},{merge:true}); } }
+  catch(err){ alert('No se pudo actualizar: '+err.message); }
+}
+window.openNotas=openNotas; window.closeNotas=closeNotas; window.markNotesSeen=markNotesSeen;
+
+/* ---------- render table ---------- */
+function debtCellHTML(d){
+  const shO=sharedOut(d), ntO=netOut(d);
+  let h='';
+  if(shO>0){ h+=`<div>${fmt(shO)}${d.debtWho?`<span class="debt-who">${d.debtWho}</span>`:''}<button type="button" class="mini-btn red" onclick="openCobro('${d.date}','shared')">Cobrar</button></div>`; }
+  if(ntO>0){ const r=ntReason(d), w=ntWho(d); h+=`<div style="margin-top:${shO>0?'6px':'0'}">${fmt(ntO)} <span class="badge-net">100% negocio</span>${(r||w)?`<span class="debt-who">${[r,w].filter(Boolean).join(' · ')}</span>`:''}<button type="button" class="mini-btn red" onclick="openCobro('${d.date}','net')">Cobrar</button></div>`; }
+  return h;
+}
+function renderDays(){
+  const rows=[...days].sort((a,b)=>b.date.localeCompare(a.date));
+  const b=document.getElementById('dayBody');
+  b.innerHTML = rows.length? rows.map(d=>{
+    const out=debtOut(d);
+    const hasDebt=out>0;
+    const needW = d.closed && !hasDebt && !hasWashers(d) && wash(d)>0;
+    const badge = hasDebt ? ' <span class="badge-val">en validación</span>'
+                : needW   ? ' <button type="button" class="mini-btn" onclick="assignWashers(\''+d.date+'\')">＋ Asignar lavadores</button>'
+                : (d.closed?' <span class="badge-lock">cerrado</span>':'');
+    return `<tr class="${hasDebt?'has-debt':''}">
+    <td>${d.date}${badge}</td>
+    <td class="num">${fmt(d.cash)}</td>
+    <td class="num">${fmt(d.virtual)}</td>
+    <td class="num park-col">${fmt(park(d))}</td>
+    <td class="num">${fmt(total(d))}</td>
+    <td class="num">${fmt(comm(d))}</td>
+    <td class="num">${fmt(biz(d))}</td>
+    <td class="num">${expenseCellHTML(d)}</td>
+    <td>${d.note||''}</td>
+    <td class="num debt-col">${debtCellHTML(d)}</td>
+    <td class="num ${net(d)>=0?'pos':'neg'}">${fmt(net(d))}</td></tr>`;}).join('')
+    : `<tr><td colspan="11" class="empty">Aún no hay días registrados. Agrega tu primer cierre arriba para empezar.</td></tr>`;
+  const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
+        P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), BZ=days.reduce((a,d)=>a+biz(d),0),
+        EX=days.reduce((a,d)=>a+(d.expense||0),0), NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
+  document.getElementById('dayFoot').innerHTML = days.length?`<tr>
+    <td>TOTAL</td><td class="num">${fmt(C)}</td><td class="num">${fmt(V)}</td><td class="num park-col">${fmt(P)}</td><td class="num">${fmt(T)}</td>
+    <td class="num">${fmt(CM)}</td><td class="num">${fmt(BZ)}</td><td class="num">${fmt(EX)}</td><td></td>
+    <td class="num debt-col">${fmt(DBT)}</td>
+    <td class="num ${NT>=0?'pos':'neg'}">${fmt(NT)}</td></tr>`:'';
+}
+
+/* ---------- KPIs ---------- */
+function renderKpis(){
+  // Ajuste fijo: una madrugada se pagaron vales + insumos sacando 715.000 del EFECTIVO.
+  // Se resta SIEMPRE del efectivo (real y fisico), independiente de lo que haya en la base.
+  const AJUSTE_EFECTIVO=715000;
+  // Un gasto MUY grande (ej. el arriendo) es un gasto fijo que AUN NO se ha pagado: se deja "abierto".
+  // Por encima de este umbral, el gasto NO se descuenta del efectivo ni de la cuenta (la plata no ha salido),
+  // pero SI se cuenta como costo (resta utilidad y suma en Gastos). Lo normal (~250k) resta de su caja.
+  const UMBRAL_EXTRA=2000000;
+  const isExtra=d=>num(d.expense)>UMBRAL_EXTRA;              // dia con gasto extraordinario
+  const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
+        P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0),
+        NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
+  // deudas cobradas, separadas por método (efectivo va a caja, tarjeta va a virtual). Cobros antiguos sin método -> efectivo.
+  const colCash=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
+  const colCard=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
+  const ND=collectedNonShared();  // deudas NO compartidas ya cobradas = ganancia neta 100% del negocio
+  // Gastos OPERATIVOS (sin el extraordinario), separados por metodo. El extraordinario se excluye por completo.
+  const expC=days.reduce((a,d)=>a+(isExtra(d)?0:expCashOf(d)),0);   // gastos en efectivo (solo operativos)
+  const expV=days.reduce((a,d)=>a+(isExtra(d)?0:expCardOf(d)),0);   // gastos en tarjeta (solo operativos)
+  const gastosOper=days.reduce((a,d)=>a+(isExtra(d)?0:num(d.expense)),0);  // gastos mostrados (solo operativos)
+  const extraExp=days.reduce((a,d)=>a+(isExtra(d)?num(d.expense):0),0);    // gasto extraordinario excluido
+  // vales (adelantos): la plata sale de la caja/cuenta al ENTREGARLOS. Vale antiguo sin origen -> efectivo.
+  const valeCash=vales.reduce((a,v)=>a+((v.source==='virtual')?0:num(v.amount)),0);
+  const valeCard=vales.reduce((a,v)=>a+((v.source==='virtual')?num(v.amount):0),0);
+  // MISMA IDEA para TODOS los numeros: se computan naturalmente desde efectivo real + cuenta real.
+  // Cada movimiento (deuda/gasto/vale) afecta su propio lado (efectivo o virtual). El extraordinario no cuenta.
+  const cashReal   = C+colCash+DBT-expC-valeCash-AJUSTE_EFECTIVO;  // efectivo real (incluye deudas por cobrar como caja futura)
+  const virtualReal= V+colCard-expV-valeCard;                      // cuenta real (virtual), sin el gasto extraordinario
+  const cashNow    = cashReal-DBT;                                 // efectivo fisico hoy (sin lo que aun deben)
+  // El gasto fijo (arriendo) AUN NO se paga: NO sale del efectivo ni de la cuenta, pero SI se cuenta
+  // como costo -> resta la utilidad y aparece en Gastos. NT ya resta todo el expense (incluido el fijo).
+  const utilidad   = NT+ND-AJUSTE_EFECTIVO;
+  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(cashReal); kVirtual.textContent=fmt(virtualReal);
+  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(gastosOper+extraExp); kNet.textContent=fmt(utilidad);
+  // Total sin deuda = plata que tenemos HOY (efectivo fisico + cuenta). Total con deuda = cuando paguen todo.
+  kNoDebt.textContent=fmt(cashNow+virtualReal); kWithDebt.textContent=fmt(cashReal+virtualReal); kDebt.textContent=fmt(DBT);
+  const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(cashNow);
+  const MK=days.reduce((a,d)=>a+mktVal(d),0); const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(MK);
+}
+
+/* ---------- lavadores: consolidado por lavador (pendiente + ya pagado) ----------
+   Recorre TODOS los días. Cada lavador que aparezca en algún día (o en la lista fija)
+   se muestra siempre, con su producción, su pendiente por pagar y lo ya pagado. */
+function aggWashers(){
+  const map={}; let uProdPend=0,uPayPend=0,uProdPaid=0,uPayPaid=0,paidTotal=0,paidMonth=0;
+  const cm=currentMonth();
+  const groups={};   // historial de pagos derivado de los días realmente pagados (clave = fecha de pago)
+  const bump=k=>{ if(!map[k]) map[k]={produced:0,payTotal:0,payPending:0,payPaid:0,valePending:0,valePaid:0}; return map[k]; };
+  days.forEach(d=>{
+    const pct=(num(d.commPct)||commPct)/100;
+    const paidDay=!!d.washPaid;
+    const inMonth=paidDay && (d.washPaidAt||'').slice(0,7)===cm;
+    let dayPay=0;
+    if(Array.isArray(d.washers) && d.washers.length){
+      d.washers.forEach(w=>{
+        const key=(w.name||'').trim()||'Sin nombre';
+        const amt=num(w.amount), pay=amt*pct; dayPay+=pay;
+        const m=bump(key); m.produced+=amt; m.payTotal+=pay;
+        if(paidDay) m.payPaid+=pay; else m.payPending+=pay;
+      });
+    } else if(wash(d)>0){
+      const pay=wash(d)*pct; dayPay+=pay;
+      if(paidDay){ uProdPaid+=wash(d); uPayPaid+=pay; } else { uProdPend+=wash(d); uPayPend+=pay; }
+    }
+    if(paidDay){
+      paidTotal+=dayPay; if(inMonth) paidMonth+=dayPay;
+      const gk=(d.washPaidAt||'anterior');
+      if(!groups[gk]) groups[gk]={paidAt:(d.washPaidAt||''),count:0,total:0};
+      groups[gk].count+=1; groups[gk].total+=dayPay;
+    }
+  });
+  roster.forEach(n=>{ const k=(n||'').trim(); if(k) bump(k); });   // que todos los lavadores fijos aparezcan siempre
+  // vales (adelantos): pendientes se restan de lo por pagar; ya descontados quedan como histórico
+  let valePendAll=0, valePaidAll=0;
+  vales.forEach(v=>{
+    const k=(v.washer||'').trim()||'Sin nombre';
+    const amt=num(v.amount);
+    const m=bump(k);
+    if(v.paid){ m.valePaid+=amt; valePaidAll+=amt; } else { m.valePending+=amt; valePendAll+=amt; }
+  });
+  const arr=Object.entries(map).map(([name,v])=>({name,...v})).sort((a,b)=>(b.payPending-b.valePending)-(a.payPending-a.valePending)||b.payTotal-a.payTotal);
+  const payHist=Object.values(groups).sort((a,b)=>(b.paidAt||'').localeCompare(a.paidAt||''));
+  return {map,arr,uProdPend,uPayPend,uProdPaid,uPayPaid,paidTotal,paidMonth,payHist,valePendAll,valePaidAll};
+}
+/* ---------- "Ya pagué a los lavadores": pone el pendiente en cero (sin tocar ganancias) y registra el pago ---------- */
+async function payWashers(){
+  const w=aggWashers();
+  const list=days.filter(d=>!d.washPaid && (Array.isArray(d.washers)&&d.washers.length ? d.washers.some(x=>num(x.amount)>0) : wash(d)>0));
+  const total=Math.round(w.arr.reduce((a,r)=>a+r.payPending,0)+w.uPayPend);
+  if(total<=0){ alert('No hay pagos pendientes.'); return; }
+  const detail=w.arr.filter(r=>r.payPending>0).map(r=>({name:r.name,amount:Math.round(r.payPending)}));
+  if(w.uPayPend>0) detail.push({name:'Sin asignar',amount:Math.round(w.uPayPend)});
+  if(!confirm('Vas a marcar como PAGADO '+fmt(total)+' a los lavadores.\n\nEsto pone el pendiente en cero (no cambia tus ganancias) y guarda el registro del pago. ¿Continuar?')) return;
+  const paidAt=new Date().toISOString().slice(0,10);
+  try{
+    for(const d of list){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:true,washPaidAt:paidAt,updatedAt:Date.now()},{merge:true}); }
+    for(const v of vales.filter(x=>!x.paid)){ await setDoc(doc(db,'vales',v.id),{paid:true,valePaidAt:paidAt},{merge:true}); }
+    await addDoc(collection(db,'pagos'),{paidAt,total,count:list.length,detail,createdAt:Date.now()});
+    alert('Pago registrado: '+fmt(total)+' a lavadores ('+list.length+' días). El pendiente vuelve a cero.');
+  }catch(err){ alert('No se pudo registrar el pago: '+err.message); }
+}
+window.payWashers=payWashers;
+/* ---------- Contraseña para acciones sensibles ---------- */
+function requirePass(){
+  const p = prompt('Esta acción está protegida.\n\nEscribe la contraseña para continuar:');
+  if(p===null) return false;               // canceló
+  if(p.trim()!=='SIMON123'){ alert('Contraseña incorrecta. Acción cancelada.'); return false; }
+  return true;
+}
+/* ---------- Deshacer último pago: devuelve los días del último pago a "por pagar" ---------- */
+async function undoPay(){
+  const paid=days.filter(d=>!!d.washPaid);
+  if(!paid.length){ alert('No hay pagos que deshacer.'); return; }
+  if(!requirePass()) return;
+  // agrupar por fecha de pago y tomar el más reciente
+  const groups={};
+  paid.forEach(d=>{ const k=d.washPaidAt||'anterior'; (groups[k]=groups[k]||[]).push(d); });
+  const lastKey=Object.keys(groups).sort((a,b)=>b.localeCompare(a))[0];
+  const list=groups[lastKey];
+  const pct=d=>(num(d.commPct)||commPct)/100;
+  const total=Math.round(list.reduce((a,d)=>{
+    const p= (Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
+    return a+p*pct(d);
+  },0));
+  const label=lastKey==='anterior'?'(pago anterior sin fecha)':lastKey;
+  if(!confirm('Vas a DESHACER el pago del '+label+'.\n\nSe devolverán '+fmt(total)+' de '+list.length+' día(s) a "Por pagar". Tus ganancias no cambian. ¿Continuar?')) return;
+  try{
+    for(const d of list){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:false,washPaidAt:'',updatedAt:Date.now()},{merge:true}); }
+    for(const v of vales.filter(x=>x.paid && (x.valePaidAt||'anterior')===lastKey)){ await setDoc(doc(db,'vales',v.id),{paid:false,valePaidAt:''},{merge:true}); }
+    alert('Pago deshecho: '+fmt(total)+' vuelve a "Por pagar".');
+  }catch(err){ alert('No se pudo deshacer el pago: '+err.message); }
+}
+window.undoPay=undoPay;
+/* ---------- Resetear pagos: devuelve TODO lo ya pagado a "por pagar" y vacía el historial ---------- */
+async function resetPay(){
+  const paid=days.filter(d=>!!d.washPaid);
+  if(!paid.length){ alert('No hay pagos registrados para resetear.'); return; }
+  if(!requirePass()) return;
+  const pct=d=>(num(d.commPct)||commPct)/100;
+  const total=Math.round(paid.reduce((a,d)=>{
+    const p=(Array.isArray(d.washers)&&d.washers.length)? d.washers.reduce((s,w)=>s+num(w.amount),0):wash(d);
+    return a+p*pct(d);
+  },0));
+  if(!confirm('RESETEAR TODOS LOS PAGOS\n\nSe devolverán '+fmt(total)+' de '+paid.length+' día(s) desde "Ya pagado" a "Por pagar", y el historial de pagos quedará vacío.\n\nTus ganancias NO cambian. ¿Continuar?')) return;
+  try{
+    for(const d of paid){ await setDoc(doc(db,COL_DAYS,d.date),{washPaid:false,washPaidAt:'',updatedAt:Date.now()},{merge:true}); }
+    for(const v of vales.filter(x=>x.paid)){ await setDoc(doc(db,'vales',v.id),{paid:false,valePaidAt:''},{merge:true}); }
+    alert('Pagos reseteados: '+fmt(total)+' vuelve a "Por pagar". El historial quedó vacío.');
+  }catch(err){ alert('No se pudo resetear: '+err.message); }
+}
+window.resetPay=resetPay;
+function renderWashersDash(){
+  const w=aggWashers();
+  const rows=w.arr.map(r=>({name:r.name,produced:r.produced,gross:r.payPending,vale:r.valePending,paid:r.payPaid,pct:r.produced>0?Math.round(r.payTotal/r.produced*100):commPct}));
+  if(w.uPayPend>0||w.uPayPaid>0) rows.push({name:'Sin asignar (días viejos)',produced:w.uProdPend+w.uProdPaid,gross:w.uPayPend,vale:0,paid:w.uPayPaid,pct:commPct});
+  const totProd=rows.reduce((a,r)=>a+r.produced,0), totGross=rows.reduce((a,r)=>a+r.gross,0),
+        totVale=rows.reduce((a,r)=>a+r.vale,0), totNeto=rows.reduce((a,r)=>a+(r.gross-r.vale),0), totPaid=rows.reduce((a,r)=>a+r.paid,0);
+  document.getElementById('washBody').innerHTML = rows.length? rows.map(r=>{const neto=r.gross-r.vale;return `<tr>
+    <td>${r.name}</td>
+    <td class="num">${fmt(r.produced)}</td>
+    <td class="num">${r.pct}%</td>
+    <td class="num">${fmt(r.gross)}</td>
+    <td class="num ${r.vale>0?'neg':''}">${r.vale>0?'−'+fmt(r.vale):fmt(0)}</td>
+    <td class="num ${neto>=0?'pos':'neg'}">${fmt(neto)}</td>
+    <td class="num">${fmt(r.paid)}</td></tr>`;}).join('')
+    : `<tr><td colspan="7" class="empty">Aún no hay lavadores por pagar. Asígnalos al cerrar un día.</td></tr>`;
+  document.getElementById('washFoot').innerHTML = rows.length?`<tr>
+    <td>TOTAL</td><td class="num">${fmt(totProd)}</td><td></td><td class="num">${fmt(totGross)}</td><td class="num ${totVale>0?'neg':''}">${totVale>0?'−'+fmt(totVale):fmt(0)}</td><td class="num">${fmt(totNeto)}</td><td class="num">${fmt(totPaid)}</td></tr>`:'';
+  document.getElementById('wPay').textContent=fmt(totNeto);
+  document.getElementById('wPaidTot').textContent=fmt(w.paidTotal);
+  document.getElementById('wPaidMonth').textContent=fmt(w.paidMonth);
+  const wv=document.getElementById('wVale'); if(wv) wv.textContent=fmt(w.valePendAll);
+  const pg=w.payHist||[];
+  const histRows=[];
+  pg.forEach(p=>histRows.push({date:p.paidAt||'',label:(p.paidAt?'Pago a lavadores':'Pago anterior')+(p.count?' ('+p.count+' día'+(p.count>1?'s':'')+')':''),total:p.total}));
+  vales.forEach(v=>histRows.push({date:v.valeAt||'',label:'Vale — '+(v.washer||'lavador'),total:num(v.amount),vale:true}));
+  histRows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('pagosBody').innerHTML = histRows.length? histRows.map(h=>`<tr><td>${h.date||'—'}</td><td>${h.label}</td><td class="num ${h.vale?'':'pos'}">${fmt(h.total)}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="empty">Aún no has registrado pagos.</td></tr>`;
+  const vs=[...vales].sort((a,b)=>(b.valeAt||'').localeCompare(a.valeAt||''));
+  const vb=document.getElementById('valesBody');
+  if(vb) vb.innerHTML = vs.length? vs.map(v=>`<tr>
+    <td>${v.valeAt||''}</td><td>${v.washer||''}</td>
+    <td class="num neg">${fmt(num(v.amount))}</td>
+    <td>${v.source==='virtual'?'tarjeta/virtual':'efectivo'}</td>
+    <td>${v.note||''}</td>
+    <td>${v.paid?'<span class="badge-lock">descontado</span>':'<span class="badge-val">pendiente</span>'}</td></tr>`).join('')
+    : `<tr><td colspan="6" class="empty">Aún no has dado vales (adelantos).</td></tr>`;
+}
+
+/* ---------- charts ---------- */
+function themeAxis(){return document.documentElement.getAttribute('data-theme')==='dark'?'#98a2b3':'#5b6472';}
+function mk(id){ if(charts[id])return charts[id]; charts[id]=echarts.init(document.getElementById(id),null,{renderer:'svg'}); return charts[id]; }
+function renderCharts(){
+  const axis=themeAxis();
+  const sorted=[...days].sort((a,b)=>a.date.localeCompare(b.date));
+  const labels=sorted.map(d=>d.date);
+  mk('chartDay').setOption({tooltip:{trigger:'axis',valueFormatter:v=>fmt(v)},legend:{data:['Lavados','Parqueadero','Utilidad negocio'],textStyle:{color:axis}},
+    grid:{left:64,right:16,top:36,bottom:40},xAxis:{type:'category',data:labels,axisLabel:{color:axis,rotate:labels.length>8?45:0}},
+    yAxis:{type:'value',axisLabel:{color:axis,formatter:v=>v>=1e6?(v/1e6)+'M':v/1e3+'k'}},
+    series:[{name:'Lavados',type:'bar',stack:'ing',data:sorted.map(wash),itemStyle:{color:'#2f6bff'}},
+            {name:'Parqueadero',type:'bar',stack:'ing',data:sorted.map(park),itemStyle:{color:'#0d9488'}},
+            {name:'Utilidad negocio',type:'bar',data:sorted.map(net),itemStyle:{color:'#17915b'}}]});
+  const CM=days.reduce((a,d)=>a+comm(d),0), EX=days.reduce((a,d)=>a+(d.expense||0),0), NT=days.reduce((a,d)=>a+net(d),0);
+  mk('chartSplit').setOption({tooltip:{trigger:'item',valueFormatter:v=>fmt(v)},legend:{bottom:0,textStyle:{color:axis}},
+    series:[{type:'pie',radius:['45%','70%'],center:['50%','44%'],label:{color:axis},data:[
+      {name:'Lavadores',value:CM,itemStyle:{color:'#b8860b'}},
+      {name:'Gastos',value:EX,itemStyle:{color:'#d1435b'}},
+      {name:'Utilidad negocio',value:Math.max(0,NT),itemStyle:{color:'#17915b'}}]}]});
+  let acc=0;const pts=sorted.map(d=>{acc+=net(d);return [d.date,acc];});
+  mk('chartNet').setOption({tooltip:{trigger:'axis',valueFormatter:v=>fmt(v)},grid:{left:64,right:16,top:20,bottom:40},
+    xAxis:{type:'category',data:pts.map(p=>p[0]),axisLabel:{color:axis,rotate:pts.length>8?45:0}},
+    yAxis:{type:'value',axisLabel:{color:axis,formatter:v=>v>=1e6?(v/1e6)+'M':v/1e3+'k'}},
+    series:[{type:'line',smooth:true,data:pts.map(p=>p[1]),areaStyle:{color:'rgba(23,145,91,.14)'},itemStyle:{color:'#17915b'}}]});
+}
+function renderWashChart(){
+  const axis=themeAxis();
+  const arr=aggWashers().arr.filter(a=>a.payPending>0);
+  mk('chartWash').setOption({tooltip:{trigger:'axis',valueFormatter:v=>fmt(v)},grid:{left:80,right:16,top:20,bottom:50},
+    xAxis:{type:'category',data:arr.map(a=>a.name),axisLabel:{color:axis,rotate:arr.length>4?30:0}},
+    yAxis:{type:'value',axisLabel:{color:axis,formatter:v=>v>=1e6?(v/1e6)+'M':v/1e3+'k'}},
+    series:[{type:'bar',data:arr.map(a=>Math.round(a.payPending)),itemStyle:{color:'#b8860b'},barMaxWidth:60,
+      label:{show:true,position:'top',color:axis,formatter:p=>fmt(p.value)}}]});
+}
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c.resize()));
+
+function renderAll(){
+  refreshPctLabels(); renderKpis(); renderDays(); renderWashersDash();
+  if(document.getElementById('resumen').classList.contains('active')) renderCharts();
+  if(document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+}
+
+/* ---------- Excel ---------- */
+function washersToStr(list){ return (list||[]).map(w=>`${w.name||''}:${w.amount||0}`).join(' | '); }
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  const rows=[...days].sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
+    Fecha:d.date,Efectivo:d.cash||0,Cuenta:d.virtual||0,Parqueadero:park(d),'Total del día':total(d),
+    ['% Lavadores']:d.commPct??commPct,['% Parq.']:d.parkPct||0,'Lavadores':comm(d),'Negocio':biz(d),
+    Gastos:d.expense||0,'Gasto método':d.expMethod||'','Gasto efectivo':expCashOf(d),'Gasto tarjeta':expCardOf(d),Detalle:d.note||'','Debe compartida':shTot(d),'Cobrado compartida':shPaid(d),'Pend. compartida':sharedOut(d),'Quién debe':d.debtWho||'','Debe neto (100%)':ntTot(d),'Cobrado neto':ntPaid(d),'Pend. neto':netOut(d),'Motivo neto':ntReason(d),'Quién debe neto':ntWho(d),'Marketing':mktVal(d),
+    'Lavadores (detalle)':washersToStr(d.washers),'Utilidad neta':net(d)}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Efectivo:'',Cuenta:'',Parqueadero:'','Total del día':'','% Lavadores':'','% Parq.':'','Lavadores':'','Negocio':'',Gastos:'','Gasto método':'','Gasto efectivo':'','Gasto tarjeta':'',Detalle:'','Debe compartida':'','Cobrado compartida':'','Pend. compartida':'','Quién debe':'','Debe neto (100%)':'','Cobrado neto':'','Pend. neto':'','Motivo neto':'','Quién debe neto':'','Marketing':'','Lavadores (detalle)':'','Utilidad neta':''}]),'CierreDiario');
+  const T=days.reduce((a,d)=>a+total(d),0),C=days.reduce((a,d)=>a+(d.cash||0),0),V=days.reduce((a,d)=>a+(d.virtual||0),0),
+        P=days.reduce((a,d)=>a+park(d),0),CM=days.reduce((a,d)=>a+comm(d),0),EX=days.reduce((a,d)=>a+(d.expense||0),0),
+        NT=days.reduce((a,d)=>a+net(d),0),DBT=days.reduce((a,d)=>a+debtOut(d),0);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([
+    {Concepto:'Total generado',Valor:T},{Concepto:'En efectivo',Valor:C},{Concepto:'En cuenta',Valor:V},
+    {Concepto:'Parqueadero',Valor:P},{Concepto:'Lavadores',Valor:CM},{Concepto:'Gastos',Valor:EX},{Concepto:'Utilidad negocio neta',Valor:NT},
+    {Concepto:'Total sin deuda (hoy)',Valor:T},{Concepto:'Total con deuda (si pagan)',Valor:T+DBT},{Concepto:'Nos falta por cobrar (deuda)',Valor:DBT},{Concepto:'Ingresos por marketing',Valor:days.reduce((a,d)=>a+mktVal(d),0)}]),'Resumen');
+  const wagg=aggWashers();
+  const wrows=wagg.arr.map(r=>({Lavador:r.name,'Produjo':Math.round(r.produced),'Comisión':Math.round(r.payPending),'Vales pendientes':Math.round(r.valePending||0),'Por pagar (neto)':Math.round((r.payPending||0)-(r.valePending||0)),'Ya pagado':Math.round(r.payPaid)}));
+  if(wagg.uPayPend>0||wagg.uPayPaid>0) wrows.push({Lavador:'Sin asignar (días viejos)','Produjo':Math.round(wagg.uProdPend+wagg.uProdPaid),'Comisión':Math.round(wagg.uPayPend),'Vales pendientes':0,'Por pagar (neto)':Math.round(wagg.uPayPend),'Ya pagado':Math.round(wagg.uPayPaid)});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wrows.length?wrows:[{Lavador:'','Produjo':'','Comisión':'','Vales pendientes':'','Por pagar (neto)':'','Ya pagado':''}]),'Lavadores');
+  const prows=[...pagos].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(p=>({['Fecha de pago']:p.paidAt||'','Días':p.count||0,'Total pagado':p.total||0,'Detalle':(p.detail||[]).map(w=>`${w.name}:${w.amount}`).join(' | ')}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(prows.length?prows:[{['Fecha de pago']:'','Días':'','Total pagado':'','Detalle':''}]),'Pagos');
+  const crows=[...cobros].sort((a,b)=>(a.paidAt||'').localeCompare(b.paidAt||'')).map(c=>({['Día de la deuda']:c.dayDate||'','Fecha de cobro':c.paidAt||'','Valor cobrado':c.amount||0,'Quién pagó':c.who||'','Cómo pagó':(c.method==='tarjeta')?'Tarjeta/cuenta':'Efectivo'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(crows.length?crows:[{['Día de la deuda']:'','Fecha de cobro':'','Valor cobrado':'','Quién pagó':'','Cómo pagó':''}]),'Cobros');
+  const vrows=[...vales].sort((a,b)=>(a.valeAt||'').localeCompare(b.valeAt||'')).map(v=>({Fecha:v.valeAt||'',Lavador:v.washer||'',Valor:num(v.amount),Origen:v.source==='virtual'?'tarjeta/virtual':'efectivo',Nota:v.note||'',Estado:v.paid?'descontado':'pendiente'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(vrows.length?vrows:[{Fecha:'',Lavador:'',Valor:'',Origen:'',Nota:'',Estado:''}]),'Vales');
+  const nrows=[...notas].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(n=>({Fecha:n.at||'',Autor:n.autor||'',Nota:n.text||'',Estado:n.seen?'vista':'nueva'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(nrows.length?nrows:[{Fecha:'',Autor:'',Nota:'',Estado:''}]),'Notas');
+  XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+/* ---------- Reporte de VENTAS de los últimos 4 días ---------- */
+function exportUltimos4(){
+  // Tomamos los 4 días MÁS RECIENTES ya registrados (por fecha), ordenados de más nuevo a más viejo.
+  const last4=[...days].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
+  if(!last4.length){ alert('Aún no hay días registrados para hacer el reporte.'); return; }
+  const wb=XLSX.utils.book_new();
+  const rows=last4.map(d=>({
+    Fecha:d.date,
+    Efectivo:num(d.cash),
+    'En cuenta':num(d.virtual),
+    Parqueadero:park(d),
+    'Total del día':total(d),
+    ['Lavadores ('+(d.commPct??commPct)+'%)']:Math.round(comm(d)),
+    'Negocio':Math.round(biz(d)),
+    Gastos:num(d.expense),
+    'Utilidad neta':Math.round(net(d)),
+    'Marketing':mktVal(d),
+    'Deuda pendiente':debtOut(d),
+    Estado: debtOut(d)>0 ? 'En validación (con deuda)' : (d.closed?'Cerrado':'—')
+  }));
+  // Totales de los 4 días
+  const sum=k=>rows.reduce((a,r)=>a+(+r[k]||0),0);
+  const cKey='Lavadores ('+(last4[0].commPct??commPct)+'%)';
+  rows.push({Fecha:'TOTAL 4 DÍAS',Efectivo:sum('Efectivo'),'En cuenta':sum('En cuenta'),Parqueadero:sum('Parqueadero'),
+    'Total del día':sum('Total del día'),[cKey]:last4.reduce((a,d)=>a+Math.round(comm(d)),0),
+    'Negocio':last4.reduce((a,d)=>a+Math.round(biz(d)),0),Gastos:sum('Gastos'),
+    'Utilidad neta':last4.reduce((a,d)=>a+Math.round(net(d)),0),'Marketing':sum('Marketing'),
+    'Deuda pendiente':sum('Deuda pendiente'),Estado:''});
+  const ws=XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,ws,'Ventas 4 días');
+  const desde=last4[last4.length-1].date, hasta=last4[0].date;
+  XLSX.writeFile(wb,'reporte_ventas_4dias_'+hasta+'.xlsx');
+}
+window.exportUltimos4=exportUltimos4;
+window.exportExcel=exportExcel;
+window.openPark=openPark;
+window.closePark=closePark;
+
+/* ---------- PDF ---------- */
+window.GleanBridge && window.GleanBridge.postMessage({actionId:'export-pdf',type:'glean-add-menu',metadata:{label:'Export as PDF',icon:'export'}});
+window.GleanBridge && window.GleanBridge.onMessage('action',d=>{if(d.actionId==='export-pdf')window.print();});
+function prepareChartsForPrint(){document.querySelectorAll('[_echarts_instance_]').forEach(el=>{const c=echarts.getInstanceByDom(el);if(!c)return;const img=new Image();img.src=c.getDataURL({type:'png',pixelRatio:2});img.className='print-chart-img';img.style.cssText='width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;z-index:10;';el.dataset.pp=el.style.position;el.style.position='relative';el.appendChild(img);});}
+function cleanUpAfterPrint(){document.querySelectorAll('[_echarts_instance_]').forEach(el=>{const img=el.querySelector('.print-chart-img');if(!img)return;img.remove();el.style.position=el.dataset.pp||'';});}
+window.addEventListener('beforeprint',()=>{document.querySelectorAll('.view').forEach(v=>v.style.display='block');prepareChartsForPrint();});
+window.addEventListener('afterprint',()=>{document.querySelectorAll('.view').forEach(v=>{v.style.display=v.classList.contains('active')?'block':'';});cleanUpAfterPrint();});
+
+/* ================= AJUSTE ÚNICO DE NÚMEROS (migración automática, corre 1 sola vez) =================
+   Deja los números acomodados en Firebase:
+   1) Efectivo (cash) de los días del reporte de Wix (Aug 3-7).
+   2) Todos los gastos sin método -> efectivo (se restan de la caja).
+   3) Todos los vales -> origen efectivo (salen de la caja, no de la tarjeta).
+   Queda una bandera en config/fixApplied para NO repetir. No toca deudas, ventas ni cuenta virtual. */
+let fixFlagLoaded=false, fixApplied=false, fixRunning=false, valesLoaded=false;
+const FIX_CASH_WIX = {
+  "2026-08-03": 319000,
+  "2026-08-04": 405000,
+  "2026-08-05": 120000,
+  "2026-08-06": 595000,
+  "2026-08-07": 155000
+};
+onSnapshot(doc(db,"config","fixApplied2"),
+  snap => { fixFlagLoaded=true; fixApplied=!!(snap.exists() && snap.data().done); maybeRunFix(); },
+  () => { fixFlagLoaded=true; }
+);
+async function maybeRunFix(){
+  if(fixApplied || fixRunning || !fixFlagLoaded) return;
+  if(!days.length || !valesLoaded) return;   // esperamos a que carguen días y vales
+  fixRunning=true;
+  try{
+    // 1) efectivo de los días de Wix
+    for(const [date,cash] of Object.entries(FIX_CASH_WIX)){
+      const d=days.find(x=>x.date===date);
+      if(d && num(d.cash)!==cash){ await setDoc(doc(db,COL_DAYS,date),{cash,updatedAt:Date.now()},{merge:true}); }
+    }
+    // Identificamos el gasto más grande: ese salió de TARJETA (no de la caja).
+    const withExp=days.filter(d=>num(d.expense)>0).sort((a,b)=>num(b.expense)-num(a.expense));
+    const bigDate=withExp.length?withExp[0].date:null;
+    // 2) gastos sin método -> efectivo, EXCEPTO el gasto más grande que va a tarjeta
+    for(const d of days){
+      const g=num(d.expense);
+      if(g<=0) continue;
+      if(d.date===bigDate){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"tarjeta",expCard:g,expCash:0,updatedAt:Date.now()},{merge:true}); }
+      else if(!d.expMethod){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"efectivo",expCash:g,expCard:0,updatedAt:Date.now()},{merge:true}); }
+    }
+    // 3) vales -> origen efectivo
+    for(const v of vales){
+      if(v.source!=="efectivo"){ await setDoc(doc(db,"vales",v.id),{source:"efectivo",updatedAt:Date.now()},{merge:true}); }
+    }
+    await setDoc(doc(db,"config","fixApplied2"),{done:true,at:new Date().toISOString()},{merge:true});
+    fixApplied=true;
+    console.log("Ajuste único aplicado: efectivo Wix + gasto grande a tarjeta + resto de gastos a efectivo + vales a efectivo.");
+  }catch(err){ console.warn("No se pudo aplicar el ajuste único:",err.message); }
+  finally{ fixRunning=false; }
+}
+
+/* ---------- init ---------- */
+initWashers();
+refreshPctLabels(); renderAll(); renderNotasBadge(); setTimeout(renderCharts,100);
+</script>
+</body>
+</html>
