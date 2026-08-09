@@ -316,7 +316,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
       <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
       <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
-      <div class="kpi"><div class="lbl">Utilidad negocio</div><div class="val" id="kNet">$0</div><div class="sub">negocio - gastos</div></div>
+      <div class="kpi"><div class="lbl">Utilidad negocio</div><div class="val" id="kNet">$0</div><div class="sub">total con deuda − todos los gastos (incluye arriendo)</div></div>
       <div class="kpi accent"><div class="lbl">Ingresos por marketing</div><div class="val" id="kMkt">$0</div><div class="sub">clientes agendados por marketing</div></div>
     </div>
 
@@ -883,7 +883,7 @@ const assignList=document.getElementById('assignWashersList');
 function assignRows(){ return [...assignList.querySelectorAll('.wash-row')]; }
 function assignSum(){ return assignRows().reduce((a,r)=>a+digits(r.querySelector('.w-amt').value),0); }
 function updateAssignCheck(){
-  const el=document.getElementById('assignCheck'); if(!el) return;
+  const el=document.getElementById('assignCheck');if(!el) return;
   const d=days.find(x=>x.date===assignDate); const target=d?wash(d):0;
   const s=assignSum(), diff=target-s;
   if(diff===0 && target>0){ el.textContent='✓ Cuadra con efectivo + cuenta ('+fmt(s)+')'; el.className='wash-check ok'; }
@@ -1223,9 +1223,13 @@ function renderKpis(){
   const cashNow    = cashReal-DBT;                                 // efectivo fisico hoy (sin lo que aun deben)
   // El gasto fijo (arriendo) AUN NO se paga: NO sale del efectivo ni de la cuenta, pero SI se cuenta
   // como costo -> resta la utilidad y aparece en Gastos. NT ya resta todo el expense (incluido el fijo).
-  const utilidad   = NT+ND+netRecv-AJUSTE_EFECTIVO;
+  // La utilidad refleja la ganancia REAL: negocio - lavadores - gastos OPERATIVOS.
+  // El arriendo (extraordinario) AUN NO se paga, asi que NO baja la utilidad hasta pagarlo (se suma de vuelta).
+  // Utilidad = Total con deuda - TODOS los gastos que llevamos (incluye el arriendo/extraordinario).
+  const gastosTotales = gastosOper + extraExp;
+  const utilidad   = (cashReal+virtualReal) - gastosTotales;
   kTotal.textContent=fmt(T+ND+netRecv); kCash.textContent=fmt(cashReal); kVirtual.textContent=fmt(virtualReal);
-  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(gastosOper+extraExp); kNet.textContent=fmt(utilidad);
+  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(gastosTotales); kNet.textContent=fmt(utilidad);
   // Total sin deuda = plata que tenemos HOY (efectivo fisico + cuenta). Total con deuda = cuando paguen todo.
   kNoDebt.textContent=fmt(cashNow+virtualReal); kWithDebt.textContent=fmt(cashReal+virtualReal); kDebt.textContent=fmt(DBT);
   const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(cashNow);
