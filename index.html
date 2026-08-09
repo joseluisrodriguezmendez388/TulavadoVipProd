@@ -600,7 +600,7 @@ const ntReason= d => (d.debtShared===false)? (d.debtReason||'') : (d.debtNetReas
 function cobroIsNet(c){ if(c.bucket) return c.bucket==='net'; const d=days.find(x=>x.date===c.dayDate); return !!(d && d.debtShared===false); }
 /* suma de cobros de deudas 100% negocio ya cobradas: son ganancia neta */
 function collectedNonShared(){ return cobros.reduce((a,c)=>a+(cobroIsNet(c)?num(c.amount):0),0); }
-const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
+const hasWashers =d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
 const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
 
 /* ---------- Firestore writes ---------- */
@@ -1189,6 +1189,9 @@ function renderKpis(){
   // Ajuste fijo: se descuenta 815.000 del EFECTIVO (vales + insumos pagados de la caja).
   // Se resta SIEMPRE del efectivo (real y fisico), independiente de lo que haya en la base.
   const AJUSTE_EFECTIVO=1530000;
+  // Ajuste inicial de la CUENTA (virtual): suma fija para cuadrar el saldo real de arranque (785.000 -> 1.070.000).
+  // Es solo para el arranque; de aqui en adelante los cobros/gastos/vales en tarjeta suman/restan sobre esta base.
+  const CUENTA_AJUSTE=285000;
   // Un gasto MUY grande (ej. el arriendo) es un gasto fijo que AUN NO se ha pagado: se deja "abierto".
   // Por encima de este umbral, el gasto NO se descuenta del efectivo ni de la cuenta (la plata no ha salido),
   // pero SI se cuenta como costo (resta utilidad y suma en Gastos). Lo normal (~250k) resta de su caja.
@@ -1216,7 +1219,7 @@ function renderKpis(){
   // MISMA IDEA para TODOS los numeros: se computan naturalmente desde efectivo real + cuenta real.
   // Cada movimiento (deuda/gasto/vale) afecta su propio lado (efectivo o virtual). El extraordinario no cuenta.
   const cashReal   = C+colCash+DBT-expC-valeCash+parkCash+netRecvCash-AJUSTE_EFECTIVO;  // efectivo real (incluye deudas por cobrar + parqueadero/100% en efectivo)
-  const virtualReal= V+colCard-expV-valeCard+parkCard+netRecvCard;                      // cuenta real (virtual) + parqueadero/100% en tarjeta
+  const virtualReal= V+colCard-expV-valeCard+parkCard+netRecvCard+CUENTA_AJUSTE;         // cuenta real (virtual) + parqueadero/100% en tarjeta + ajuste inicial
   const cashNow    = cashReal-DBT;                                 // efectivo fisico hoy (sin lo que aun deben)
   // El gasto fijo (arriendo) AUN NO se paga: NO sale del efectivo ni de la cuenta, pero SI se cuenta
   // como costo -> resta la utilidad y aparece en Gastos. NT ya resta todo el expense (incluido el fijo).
@@ -1356,7 +1359,7 @@ function renderWashersDash(){
     <td class="num">${fmt(r.paid)}</td></tr>`;}).join('')
     : `<tr><td colspan="7" class="empty">Aún no hay lavadores por pagar. Asígnalos al cerrar un día.</td></tr>`;
   document.getElementById('washFoot').innerHTML = rows.length?`<tr>
-    <td>TOTAL</td><td class="num">${fmt(totProd)}</td><td></td><td class="num">${fmt(totGross)}</td><td class="num ${totVale>0?'neg':''}">${totVale>0?'−'+fmt(totVale):fmt(0)}</td><td class="num">${fmt(totNeto)}</td><td class="num">${fmt(totPaid)}</td></tr>`:'';
+<td>TOTAL</td><td class="num">${fmt(totProd)}</td><td></td><td class="num">${fmt(totGross)}</td><td class="num ${totVale>0?'neg':''}">${totVale>0?'−'+fmt(totVale):fmt(0)}</td><td class="num">${fmt(totNeto)}</td><td class="num">${fmt(totPaid)}</td></tr>`:'';
   document.getElementById('wPay').textContent=fmt(totNeto);
   document.getElementById('wPaidTot').textContent=fmt(w.paidTotal);
   document.getElementById('wPaidMonth').textContent=fmt(w.paidMonth);
