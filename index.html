@@ -625,7 +625,6 @@ onSnapshot(collection(db, COL_DAYS),
     days = snap.docs.map(x => ({ id:x.id, ...x.data() }));
     setStatus("on", "Conectado");
     renderAll();
-    if(typeof maybeRunFix==="function") maybeRunFix();
   },
   err => { setStatus("off", "Sin conexión (" + err.code + ")"); }
 );
@@ -670,10 +669,8 @@ onSnapshot(collection(db, "cobros"),
 onSnapshot(collection(db, "vales"),
   snap => {
     vales = snap.docs.map(x => ({ id:x.id, ...x.data() }));
-    valesLoaded = true;
     renderWashersDash();
     if (document.getElementById('lavadores').classList.contains('active')) renderWashChart();
-    if(typeof maybeRunFix==="function") maybeRunFix();
   },
   () => {}
 );
@@ -1157,9 +1154,6 @@ function renderDays(){
 
 /* ---------- KPIs ---------- */
 function renderKpis(){
-  // Ajuste fijo: una madrugada se pagaron vales + insumos sacando 715.000 del EFECTIVO.
-  // Se resta SIEMPRE del efectivo (real y fisico), independiente de lo que haya en la base.
-  const AJUSTE_EFECTIVO=715000;
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0), EX=days.reduce((a,d)=>a+(d.expense||0),0),
         NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
@@ -1171,16 +1165,10 @@ function renderKpis(){
   // vales (adelantos): la plata sale de la caja/cuenta al ENTREGARLOS. Vale antiguo sin origen -> efectivo.
   const valeCash=vales.reduce((a,v)=>a+((v.source==='virtual')?0:num(v.amount)),0);
   const valeCard=vales.reduce((a,v)=>a+((v.source==='virtual')?num(v.amount):0),0);
-  // MISMA IDEA para TODOS los numeros: todo se construye desde el efectivo real + la cuenta real.
-  // Asi el ajuste de 715.000 (y cualquier gasto/vale) fluye consistente por todos los totales.
-  const cashReal   = C+colCash+DBT-expC-valeCash-AJUSTE_EFECTIVO;  // efectivo real (incluye deudas por cobrar como caja futura)
-  const virtualReal= V+colCard-expV-valeCard;                       // cuenta real
-  const cashNow    = cashReal-DBT;                                  // efectivo fisico hoy (sin lo que aun deben)
-  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(cashReal); kVirtual.textContent=fmt(virtualReal);
-  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT+ND-AJUSTE_EFECTIVO);
-  // Total sin deuda = plata que tenemos HOY (efectivo fisico + cuenta). Total con deuda = cuando paguen todo.
-  kNoDebt.textContent=fmt(cashNow+virtualReal); kWithDebt.textContent=fmt(cashReal+virtualReal); kDebt.textContent=fmt(DBT);
-  const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(cashNow);
+  kTotal.textContent=fmt(T+ND); kCash.textContent=fmt(C+colCash+DBT-expC-valeCash); kVirtual.textContent=fmt(V+colCard-expV-valeCard);
+  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(EX); kNet.textContent=fmt(NT+ND);
+  kNoDebt.textContent=fmt(T+ND); kWithDebt.textContent=fmt(T+ND+DBT); kDebt.textContent=fmt(DBT);
+  const cashNow=C+colCash-expC-valeCash; const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(cashNow);
   const MK=days.reduce((a,d)=>a+mktVal(d),0); const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(MK);
 }
 
@@ -1452,55 +1440,6 @@ function prepareChartsForPrint(){document.querySelectorAll('[_echarts_instance_]
 function cleanUpAfterPrint(){document.querySelectorAll('[_echarts_instance_]').forEach(el=>{const img=el.querySelector('.print-chart-img');if(!img)return;img.remove();el.style.position=el.dataset.pp||'';});}
 window.addEventListener('beforeprint',()=>{document.querySelectorAll('.view').forEach(v=>v.style.display='block');prepareChartsForPrint();});
 window.addEventListener('afterprint',()=>{document.querySelectorAll('.view').forEach(v=>{v.style.display=v.classList.contains('active')?'block':'';});cleanUpAfterPrint();});
-
-/* ================= AJUSTE ÚNICO DE NÚMEROS (migración automática, corre 1 sola vez) =================
-   Deja los números acomodados en Firebase:
-   1) Efectivo (cash) de los días del reporte de Wix (Aug 3-7).
-   2) Todos los gastos sin método -> efectivo (se restan de la caja).
-   3) Todos los vales -> origen efectivo (salen de la caja, no de la tarjeta).
-   Queda una bandera en config/fixApplied para NO repetir. No toca deudas, ventas ni cuenta virtual. */
-let fixFlagLoaded=false, fixApplied=false, fixRunning=false, valesLoaded=false;
-const FIX_CASH_WIX = {
-  "2026-08-03": 319000,
-  "2026-08-04": 405000,
-  "2026-08-05": 120000,
-  "2026-08-06": 595000,
-  "2026-08-07": 155000
-};
-onSnapshot(doc(db,"config","fixApplied2"),
-  snap => { fixFlagLoaded=true; fixApplied=!!(snap.exists() && snap.data().done); maybeRunFix(); },
-  () => { fixFlagLoaded=true; }
-);
-async function maybeRunFix(){
-  if(fixApplied || fixRunning || !fixFlagLoaded) return;
-  if(!days.length || !valesLoaded) return;   // esperamos a que carguen días y vales
-  fixRunning=true;
-  try{
-    // 1) efectivo de los días de Wix
-    for(const [date,cash] of Object.entries(FIX_CASH_WIX)){
-      const d=days.find(x=>x.date===date);
-      if(d && num(d.cash)!==cash){ await setDoc(doc(db,COL_DAYS,date),{cash,updatedAt:Date.now()},{merge:true}); }
-    }
-    // Identificamos el gasto más grande: ese salió de TARJETA (no de la caja).
-    const withExp=days.filter(d=>num(d.expense)>0).sort((a,b)=>num(b.expense)-num(a.expense));
-    const bigDate=withExp.length?withExp[0].date:null;
-    // 2) gastos sin método -> efectivo, EXCEPTO el gasto más grande que va a tarjeta
-    for(const d of days){
-      const g=num(d.expense);
-      if(g<=0) continue;
-      if(d.date===bigDate){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"tarjeta",expCard:g,expCash:0,updatedAt:Date.now()},{merge:true}); }
-      else if(!d.expMethod){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"efectivo",expCash:g,expCard:0,updatedAt:Date.now()},{merge:true}); }
-    }
-    // 3) vales -> origen efectivo
-    for(const v of vales){
-      if(v.source!=="efectivo"){ await setDoc(doc(db,"vales",v.id),{source:"efectivo",updatedAt:Date.now()},{merge:true}); }
-    }
-    await setDoc(doc(db,"config","fixApplied2"),{done:true,at:new Date().toISOString()},{merge:true});
-    fixApplied=true;
-    console.log("Ajuste único aplicado: efectivo Wix + gasto grande a tarjeta + resto de gastos a efectivo + vales a efectivo.");
-  }catch(err){ console.warn("No se pudo aplicar el ajuste único:",err.message); }
-  finally{ fixRunning=false; }
-}
 
 /* ---------- init ---------- */
 initWashers();
