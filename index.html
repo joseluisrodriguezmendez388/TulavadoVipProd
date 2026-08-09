@@ -316,7 +316,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
       <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
       <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
-      <div class="kpi"><div class="lbl">Utilidad negocio</div><div class="val" id="kNet">$0</div><div class="sub">negocio - gastos</div></div>
+      <div class="kpi"><div class="lbl">Utilidad negocio</div><div class="val" id="kNet">$0</div><div class="sub">total con deuda − todos los gastos (incluye arriendo)</div></div>
       <div class="kpi accent"><div class="lbl">Ingresos por marketing</div><div class="val" id="kMkt">$0</div><div class="sub">clientes agendados por marketing</div></div>
     </div>
 
@@ -600,7 +600,7 @@ const ntReason= d => (d.debtShared===false)? (d.debtReason||'') : (d.debtNetReas
 function cobroIsNet(c){ if(c.bucket) return c.bucket==='net'; const d=days.find(x=>x.date===c.dayDate); return !!(d && d.debtShared===false); }
 /* suma de cobros de deudas 100% negocio ya cobradas: son ganancia neta */
 function collectedNonShared(){ return cobros.reduce((a,c)=>a+(cobroIsNet(c)?num(c.amount):0),0); }
-const hasWashers =d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
+const hasWashers = d => Array.isArray(d.washers) && d.washers.length>0;             // ya tiene desglose de lavadores
 const isLocked   = d => !!(d && d.closed && debtOut(d)===0 && hasWashers(d));       // consolidado (sin deuda + lavadores) -> bloqueado
 
 /* ---------- Firestore writes ---------- */
@@ -883,7 +883,7 @@ const assignList=document.getElementById('assignWashersList');
 function assignRows(){ return [...assignList.querySelectorAll('.wash-row')]; }
 function assignSum(){ return assignRows().reduce((a,r)=>a+digits(r.querySelector('.w-amt').value),0); }
 function updateAssignCheck(){
-  const el=document.getElementById('assignCheck'); if(!el) return;
+  const el=document.getElementById('assignCheck');if(!el) return;
   const d=days.find(x=>x.date===assignDate); const target=d?wash(d):0;
   const s=assignSum(), diff=target-s;
   if(diff===0 && target>0){ el.textContent='✓ Cuadra con efectivo + cuenta ('+fmt(s)+')'; el.className='wash-check ok'; }
@@ -1223,9 +1223,13 @@ function renderKpis(){
   const cashNow    = cashReal-DBT;                                 // efectivo fisico hoy (sin lo que aun deben)
   // El gasto fijo (arriendo) AUN NO se paga: NO sale del efectivo ni de la cuenta, pero SI se cuenta
   // como costo -> resta la utilidad y aparece en Gastos. NT ya resta todo el expense (incluido el fijo).
-  const utilidad   = NT+ND+netRecv-AJUSTE_EFECTIVO;
+  // La utilidad refleja la ganancia REAL: negocio - lavadores - gastos OPERATIVOS.
+  // El arriendo (extraordinario) AUN NO se paga, asi que NO baja la utilidad hasta pagarlo (se suma de vuelta).
+  // Utilidad = Total con deuda - TODOS los gastos que llevamos (incluye el arriendo/extraordinario).
+  const gastosTotales = gastosOper + extraExp;
+  const utilidad   = (cashReal+virtualReal) - gastosTotales;
   kTotal.textContent=fmt(T+ND+netRecv); kCash.textContent=fmt(cashReal); kVirtual.textContent=fmt(virtualReal);
-  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(gastosOper+extraExp); kNet.textContent=fmt(utilidad);
+  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(gastosTotales); kNet.textContent=fmt(utilidad);
   // Total sin deuda = plata que tenemos HOY (efectivo fisico + cuenta). Total con deuda = cuando paguen todo.
   kNoDebt.textContent=fmt(cashNow+virtualReal); kWithDebt.textContent=fmt(cashReal+virtualReal); kDebt.textContent=fmt(DBT);
   const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(cashNow);
@@ -1359,7 +1363,7 @@ function renderWashersDash(){
     <td class="num">${fmt(r.paid)}</td></tr>`;}).join('')
     : `<tr><td colspan="7" class="empty">Aún no hay lavadores por pagar. Asígnalos al cerrar un día.</td></tr>`;
   document.getElementById('washFoot').innerHTML = rows.length?`<tr>
-<td>TOTAL</td><td class="num">${fmt(totProd)}</td><td></td><td class="num">${fmt(totGross)}</td><td class="num ${totVale>0?'neg':''}">${totVale>0?'−'+fmt(totVale):fmt(0)}</td><td class="num">${fmt(totNeto)}</td><td class="num">${fmt(totPaid)}</td></tr>`:'';
+    <td>TOTAL</td><td class="num">${fmt(totProd)}</td><td></td><td class="num">${fmt(totGross)}</td><td class="num ${totVale>0?'neg':''}">${totVale>0?'−'+fmt(totVale):fmt(0)}</td><td class="num">${fmt(totNeto)}</td><td class="num">${fmt(totPaid)}</td></tr>`:'';
   document.getElementById('wPay').textContent=fmt(totNeto);
   document.getElementById('wPaidTot').textContent=fmt(w.paidTotal);
   document.getElementById('wPaidMonth').textContent=fmt(w.paidMonth);
