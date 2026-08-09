@@ -1519,6 +1519,7 @@ const FIX_CASH_WIX = {
   "2026-08-06": 595000,
   "2026-08-07": 155000
 };
+  
 onSnapshot(doc(db,"config","fixApplied2"),
   snap => { fixFlagLoaded=true; fixApplied=!!(snap.exists() && snap.data().done); maybeRunFix(); },
   () => { fixFlagLoaded=true; }
