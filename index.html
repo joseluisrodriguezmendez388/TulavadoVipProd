@@ -1157,9 +1157,9 @@ function renderDays(){
 
 /* ---------- KPIs ---------- */
 function renderKpis(){
-  // Ajuste fijo: una madrugada se pagaron vales + insumos sacando 715.000 del EFECTIVO.
+  // Ajuste fijo: se descuenta 815.000 del EFECTIVO (vales + insumos pagados de la caja).
   // Se resta SIEMPRE del efectivo (real y fisico), independiente de lo que haya en la base.
-  const AJUSTE_EFECTIVO=715000;
+  const AJUSTE_EFECTIVO=1530000;
   // Un gasto MUY grande (ej. el arriendo) es un gasto fijo que AUN NO se ha pagado: se deja "abierto".
   // Por encima de este umbral, el gasto NO se descuenta del efectivo ni de la cuenta (la plata no ha salido),
   // pero SI se cuenta como costo (resta utilidad y suma en Gastos). Lo normal (~250k) resta de su caja.
