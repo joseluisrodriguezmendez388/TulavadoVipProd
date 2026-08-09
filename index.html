@@ -226,7 +226,6 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <button class="btn bell" id="btnNotas" onclick="openNotas()"><span class="bell-ico">🔔</span> Pendientes<span class="dot" id="notasDot" style="display:none">0</span></button>
     <button class="btn" onclick="exportExcel()">Exportar Excel</button>
     <button class="btn" onclick="exportUltimos4()">Reporte últimos 4 días</button>
-    <button class="btn" onclick="openAjustes()">⚙ Ajustes iniciales</button>
   </div>
 </header>
 
@@ -508,24 +507,6 @@ tr.has-debt{background:var(--artifact-red-soft)}
   </div>
 </div>
 
-<!-- MODAL AJUSTES INICIALES -->
-<div class="modal-back" id="ajustesModal">
-  <div class="modal">
-    <h3>⚙ Ajustes iniciales</h3>
-    <p class="sub">Estos valores se guardan en la nube (Firebase) y afectan TODOS los cálculos en tiempo real. Al cambiar uno, se recalculan efectivo, cuenta, utilidad y los totales. Son para cuadrar el arranque; cuando quieras, ponlos en 0.</p>
-    <form id="ajustesForm">
-      <label class="field">Descuento fijo del EFECTIVO (vales + insumos que salieron de la caja)<input type="text" inputmode="numeric" id="aEfectivo" placeholder="0" autocomplete="off"></label>
-      <label class="field">Ajuste inicial de la CUENTA (virtual)<input type="text" inputmode="numeric" id="aCuenta" placeholder="0" autocomplete="off"></label>
-      <label class="field">Umbral de gasto extraordinario (arriendo no pagado)<input type="text" inputmode="numeric" id="aUmbral" placeholder="2.000.000" autocomplete="off"></label>
-      <p class="sub" id="aInfo" style="margin:0"></p>
-      <div class="row">
-        <button type="button" class="btn ghost" onclick="closeAjustes()">Cancelar</button>
-        <button type="submit" class="btn primary">Guardar (tiempo real)</button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <!-- MODAL NOTAS -->
 <div class="modal-back" id="notasModal">
   <div class="modal" style="max-width:520px">
@@ -587,7 +568,6 @@ let pagos = [];                                        // registros de pago a la
 let cobros = [];                                       // registros de cobro de deudas
 let vales = [];                                        // adelantos (vales) entregados a lavadores
 let notas = [];                                        // notas de administradores (revisión fin de mes)
-let ajustes = { efectivo:1530000, cuenta:285000, umbralExtra:2000000 };  // ajustes editables (Firebase config/ajustes)
 let charts = {};
 
 /* ---------- per-day math ---------- */
@@ -710,22 +690,6 @@ onSnapshot(collection(db, "vales"),
 /* notas de administradores */
 onSnapshot(collection(db, "notas"),
   snap => { notas = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderNotasBadge(); if(document.getElementById('notasModal').classList.contains('open')) renderNotas(); },
-  () => {}
-);
-/* ajustes iniciales editables (efectivo, cuenta, umbral extraordinario) — en tiempo real */
-onSnapshot(doc(db, "config", "ajustes"),
-  snap => {
-    if(snap.exists()){
-      const a=snap.data();
-      ajustes = {
-        efectivo: Number.isFinite(+a.efectivo)? +a.efectivo : 1530000,
-        cuenta:   Number.isFinite(+a.cuenta)?   +a.cuenta   : 285000,
-        umbralExtra: Number.isFinite(+a.umbralExtra)? +a.umbralExtra : 2000000
-      };
-    }
-    renderAll();
-    if(document.getElementById('ajustesModal') && document.getElementById('ajustesModal').classList.contains('open')) fillAjustes();
-  },
   () => {}
 );
 
@@ -919,7 +883,7 @@ const assignList=document.getElementById('assignWashersList');
 function assignRows(){ return [...assignList.querySelectorAll('.wash-row')]; }
 function assignSum(){ return assignRows().reduce((a,r)=>a+digits(r.querySelector('.w-amt').value),0); }
 function updateAssignCheck(){
-  const el=document.getElementById('assignCheck'); if(!el) return;
+  const el=document.getElementById('assignCheck');if(!el) return;
   const d=days.find(x=>x.date===assignDate); const target=d?wash(d):0;
   const s=assignSum(), diff=target-s;
   if(diff===0 && target>0){ el.textContent='✓ Cuadra con efectivo + cuenta ('+fmt(s)+')'; el.className='wash-check ok'; }
@@ -1179,25 +1143,6 @@ async function markNotesSeen(){
 }
 window.openNotas=openNotas; window.closeNotas=closeNotas; window.markNotesSeen=markNotesSeen;
 
-/* ================= AJUSTES INICIALES (editables, Firebase) ================= */
-['aEfectivo','aCuenta','aUmbral'].forEach(attachSep);
-function fillAjustes(){
-  document.getElementById('aEfectivo').value=sep(ajustes.efectivo||0);
-  document.getElementById('aCuenta').value=sep(ajustes.cuenta||0);
-  document.getElementById('aUmbral').value=sep(ajustes.umbralExtra||0);
-  const el=document.getElementById('aInfo'); if(el) el.textContent='Efectivo se descuenta '+fmt(ajustes.efectivo||0)+' · Cuenta suma '+fmt(ajustes.cuenta||0)+' · Gasto extraordinario > '+fmt(ajustes.umbralExtra||0)+'.';
-}
-function openAjustes(){ fillAjustes(); document.getElementById('ajustesModal').classList.add('open'); }
-function closeAjustes(){ document.getElementById('ajustesModal').classList.remove('open'); }
-document.getElementById('ajustesModal').addEventListener('click',e=>{ if(e.target.id==='ajustesModal') closeAjustes(); });
-document.getElementById('ajustesForm').onsubmit=async e=>{
-  e.preventDefault();
-  const payload={ efectivo:numVal(document.getElementById('aEfectivo')), cuenta:numVal(document.getElementById('aCuenta')), umbralExtra:numVal(document.getElementById('aUmbral'))||2000000, updatedAt:Date.now() };
-  try{ await setDoc(doc(db,'config','ajustes'), payload, {merge:true}); closeAjustes(); }
-  catch(err){ alert('No se pudo guardar el ajuste: '+err.message); }
-};
-window.openAjustes=openAjustes; window.closeAjustes=closeAjustes;
-
 /* ---------- render table ---------- */
 function debtCellHTML(d){
   const shO=sharedOut(d), ntO=netOut(d);
@@ -1243,10 +1188,14 @@ function renderDays(){
 function renderKpis(){
   // Ajuste fijo: se descuenta 815.000 del EFECTIVO (vales + insumos pagados de la caja).
   // Se resta SIEMPRE del efectivo (real y fisico), independiente de lo que haya en la base.
-  // Ajustes editables desde el panel (guardados en Firebase config/ajustes). Se modifican en vivo.
-  const AJUSTE_EFECTIVO=num(ajustes.efectivo);   // se descuenta del efectivo (vales + insumos pagados de la caja)
-  const CUENTA_AJUSTE=num(ajustes.cuenta);       // ajuste inicial de la cuenta (virtual)
-  const UMBRAL_EXTRA=num(ajustes.umbralExtra)||2000000;   // gasto > umbral = extraordinario (arriendo no pagado)
+  const AJUSTE_EFECTIVO=1530000;
+  // Ajuste inicial de la CUENTA (virtual): suma fija para cuadrar el saldo real de arranque (785.000 -> 1.070.000).
+  // Es solo para el arranque; de aqui en adelante los cobros/gastos/vales en tarjeta suman/restan sobre esta base.
+  const CUENTA_AJUSTE=285000;
+  // Un gasto MUY grande (ej. el arriendo) es un gasto fijo que AUN NO se ha pagado: se deja "abierto".
+  // Por encima de este umbral, el gasto NO se descuenta del efectivo ni de la cuenta (la plata no ha salido),
+  // pero SI se cuenta como costo (resta utilidad y suma en Gastos). Lo normal (~250k) resta de su caja.
+  const UMBRAL_EXTRA=2000000;
   const isExtra=d=>num(d.expense)>UMBRAL_EXTRA;              // dia con gasto extraordinario
   const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
         P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0),
