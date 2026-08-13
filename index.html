@@ -653,10 +653,9 @@ const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;  // 
 const wash  = d => num(d.cash)+num(d.virtual);
 const park  = d => num(d.park);
 const total = d => wash(d)+park(d);
-const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;  // lavadores
-const biz   = d => total(d)-comm(d);                                               // negocio
-const partDebt = d => shTot(d)*((d.commPct??commPct)/100);                          // participación lavadores sobre deuda compartida GENERADA (Sección 17)
-const net   = d => biz(d)+(shTot(d)-partDebt(d))+ntTot(d)-num(d.expense);           // utilidad neta = negocio(lavados/parq) + parte negocio de deuda compartida (65%) + deuda 100% negocio − gastos
+const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;  // lavadores (wash YA incluye la deuda compartida embebida en la caja)
+const biz   = d => total(d)-comm(d);                                               // negocio (incluye el 65% de la deuda compartida embebida en lavados/parq)
+const net   = d => biz(d)+ntTot(d)-num(d.expense);                                 // utilidad neta = negocio(lavados/parq, ya incluye deuda compartida) + deuda 100% negocio − gastos
 const debt  = d => num(d.debt);                                                    // deuda original registrada
 const mktVal = d => d.mkt ? num(d.mktValue) : 0;                                    // ingreso atribuido a marketing ese día
 /* --- gastos por método (para descontar de la caja/cuenta correcta). Gasto antiguo sin método -> pendiente, no se descuenta hasta asignarlo. */
@@ -1447,16 +1446,22 @@ function calcFin(){
   const shGen = days.reduce((a,d)=>a+shTot(d),0);       // deuda compartida generada
   const ntGen = days.reduce((a,d)=>a+ntTot(d),0);       // deuda 100% negocio generada
   const deudaGen = shGen+ntGen;
-  const generado = lav + P + deudaGen + mIncTot;        // TOTAL GENERADO (venta a crédito + ingresos manuales)
+  // TOTAL GENERADO: la deuda COMPARTIDA ya está embebida en el efectivo/cuenta del cierre -> NO se suma aparte.
+  // La deuda 100% NEGOCIO (ntGen) sí es una venta separada a crédito -> sí suma. Más los ingresos manuales.
+  const generado = lav + P + ntGen + mIncTot;
 
   // por cobrar (pendiente)
   const shOut = days.reduce((a,d)=>a+sharedOut(d),0);
   const ntOut = days.reduce((a,d)=>a+netOut(d),0);
   const porCobrar = shOut+ntOut;
 
-  // cobros de deuda por método (mueven por cobrar -> caja/cuenta; NO re-suman a generado)
-  const colCash = cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
-  const colCard = cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
+  // cobros de deuda por método Y por tipo (mueven por cobrar -> caja/cuenta; NO re-suman a generado).
+  // Compartida: convierte deuda embebida en la caja -> dinero real. Neta (100% negocio): trae dinero nuevo.
+  const colCashShared = cobros.reduce((a,c)=>a+((!cobroIsNet(c) && c.method!=='tarjeta')?num(c.amount):0),0);
+  const colCardShared = cobros.reduce((a,c)=>a+((!cobroIsNet(c) && c.method==='tarjeta')?num(c.amount):0),0);
+  const colCashNet    = cobros.reduce((a,c)=>a+(( cobroIsNet(c) && c.method!=='tarjeta')?num(c.amount):0),0);
+  const colCardNet    = cobros.reduce((a,c)=>a+(( cobroIsNet(c) && c.method==='tarjeta')?num(c.amount):0),0);
+  const colCash = colCashShared+colCashNet, colCard = colCardShared+colCardNet;   // totales (compatibilidad/export)
 
   // deuda 100% negocio recibida EN el cierre (ya entró, no queda pendiente)
   const netRecvCash = days.reduce((a,d)=>a+num(d.debtNetCash),0);
@@ -1480,11 +1485,16 @@ function calcFin(){
   const exIncCash=num(extra.incomeCash), exIncCard=num(extra.incomeCard);
   const exExpCash=num(extra.expenseCash), exExpCard=num(extra.expenseCard);
 
-  // EFECTIVO FÍSICO (sin deuda por cobrar)
-  const efectivo = C + colCash + netRecvCash + parkCash + exIncCash + mIncCash
+  // EFECTIVO FÍSICO: la caja del cierre (C) YA incluye la deuda compartida. Se resta la deuda compartida
+  // GENERADA y se re-suma solo lo cobrado EN EFECTIVO (lo cobrado en tarjeta se mueve a la cuenta). Así la
+  // deuda compartida PENDIENTE queda fuera del efectivo físico (Regla Maestra). La deuda 100% negocio nunca
+  // estuvo en la caja: entra solo al cobrarse (colCashNet) o si entró en el cierre (netRecvCash).
+  const efectivo = C - shGen + colCashShared
+                   + colCashNet + netRecvCash + parkCash + exIncCash + mIncCash
                    - expCash - valeCash - exExpCash - mExpCash - A_EF;
-  // CUENTA (virtual)
-  const cuenta   = V + colCard + netRecvCard + parkCard + exIncCard + mIncCard
+  // CUENTA (virtual): + deuda compartida cobrada en tarjeta + deuda neta cobrada/recibida en tarjeta.
+  const cuenta   = V + colCardShared
+                   + colCardNet + netRecvCard + parkCard + exIncCard + mIncCard
                    - expCard - valeCard - exExpCard - mExpCard + A_CU;
 
   // ---- CONCILIACIÓN MANUAL (ancla de saldo real; NO afecta utilidad ni total generado — Secciones 11/12/23) ----
@@ -1498,10 +1508,10 @@ function calcFin(){
   const cuentaReal   = cuenta   + bankAdj;   // CUENTA real conciliada
   const totalRealDisp = efectivoReal + cuentaReal;
 
-  // comisiones (solo lavados+parqueadero; deuda compartida ver conciliación)
-  const comision = days.reduce((a,d)=>a+comm(d),0);                 // participación base (lavados+parqueadero)
-  const partDebtTot = days.reduce((a,d)=>a+shTot(d)*((num(d.commPct)||commPct)/100),0);  // participación sobre deuda compartida GENERADA (Sección 17)
-  const partLav = comision + partDebtTot;                          // PARTICIPACIÓN LAVADORES total (reconocida al generar, una sola vez)
+  // PARTICIPACIÓN LAVADORES: comm() ya calcula el 35% sobre wash (que INCLUYE la deuda compartida embebida),
+  // así que la participación sobre la deuda compartida ya está contenida aquí (se reconoce UNA vez al generar).
+  const comision = days.reduce((a,d)=>a+comm(d),0);
+  const partLav = comision;                                        // PARTICIPACIÓN LAVADORES total
   const ingresoNegocio = generado - partLav;                       // INGRESO NEGOCIO = total generado − participación lavadores
   // utilidad (definición ÚNICA) = ingreso negocio − gastos
   const utilidad = ingresoNegocio - gastosTot;
@@ -1515,7 +1525,7 @@ function calcFin(){
     mIncCash,mIncCard,mExpCash,mExpCard,mIncTot,mExpTot,
     colCash,colCard,netRecvCash,netRecvCard,parkCash,parkCard,expCash,expCard,
     gastosTot,gastosSinMetodo,valeCash,valeCard,exIncCash,exIncCard,exExpCash,exExpCard,
-    efectivo,cuenta,cashAdj,bankAdj,efectivoReal,cuentaReal,totalRealDisp,lastCashRecon,lastBankRecon,comision,partDebtTot,partLav,ingresoNegocio,utilidad,totalSinDeuda,totalConDeuda,marketing,ingresado};
+    efectivo,cuenta,cashAdj,bankAdj,efectivoReal,cuentaReal,totalRealDisp,lastCashRecon,lastBankRecon,comision,partLav,ingresoNegocio,utilidad,totalSinDeuda,totalConDeuda,marketing,ingresado};
 }
 
 function renderKpis(){
@@ -1547,7 +1557,7 @@ function renderReconciliation(){
     if(netOut(d)>0 && !ntWho(d).trim()) sinAsignar+=netOut(d);
   });
   if(sinAsignar>0) alerts.push('Deuda por cobrar sin cliente asignado: '+fmt(sinAsignar)+'.');
-  if(f.partDebtTot>0) alerts.push('Participación de lavadores sobre deuda compartida reconocida en la utilidad: '+fmt(f.partDebtTot)+' (Sección 17: la deuda compartida reparte '+commPct+'% al lavador al generarse). Este monto todavía NO está asignado a un lavador específico en la pestaña Lavadores; esa asignación/pago se implementa en la 2ª entrega.');
+  if(f.shOut>0) alerts.push('Deuda compartida embebida en la caja del cierre: pendiente '+fmt(f.shOut)+'. Ya está RESTADA del efectivo físico (queda fuera del disponible hasta que se cobre). Al cobrarla, decides si entra por efectivo o por cuenta.');
   if(f.exIncCash||f.exIncCard||f.exExpCash||f.exExpCard) alerts.push('Ajustes extra legacy activos (config/ajustesExtra): +ef '+fmt(f.exIncCash)+' · +cta '+fmt(f.exIncCard)+' · −ef '+fmt(f.exExpCash)+' · −cta '+fmt(f.exExpCard)+'. Ya no hay botón que los genere; revísalos.');
   if(f.A_EF>0) alerts.push('Descuento fijo del EFECTIVO aplicado: '+fmt(f.A_EF)+' (cubre pagos a lavadores e insumos históricos pagados desde la caja).');
   if(f.cashAdj!==0||f.bankAdj!==0) alerts.push('Conciliación manual activa (Administración de cuenta): ajuste efectivo '+fmt(f.cashAdj)+' · ajuste cuenta '+fmt(f.bankAdj)+'. Fija el saldo real como punto de partida; NO afecta utilidad ni total generado.');
@@ -1558,18 +1568,17 @@ function renderReconciliation(){
         rowT('Total generado',f.generado,'pos')+
         rowT('· Lavados',f.lav)+
         rowT('· Parqueadero',f.P)+
-        rowT('· Deuda generada (crédito)',f.deudaGen)+
+        rowT('· Deuda 100% negocio (crédito)',f.ntGen)+
         rowT('· Ingresos manuales',f.mIncTot)+
         rowT('Ya ingresado (generado − por cobrar)',f.ingresado)+
         rowT('Por cobrar (cuentas por cobrar)',f.porCobrar,'neg')+
       '</tbody></table></div>'+
       '<div><table><thead><tr><th>Disponible / resultado</th><th class="num">Valor</th></tr></thead><tbody>'+
-        rowT('Efectivo físico (sin deuda)',f.efectivo,'pos')+
+        rowT('Efectivo físico (caja − deuda compart. pendiente)',f.efectivo,'pos')+
         rowT('Cuenta (virtual)',f.cuenta,'pos')+
         rowT('Total sin deuda',f.totalSinDeuda)+
         rowT('Total con deuda',f.totalConDeuda)+
-        rowT('(−) Particip. lavadores (lavados+parq)',f.comision,'neg')+
-        rowT('(−) Particip. lavadores (deuda compart.)',f.partDebtTot,'neg')+
+        rowT('(−) Participación lavadores',f.comision,'neg')+
         rowT('(=) Ingreso negocio',f.ingresoNegocio,'pos')+
         rowT('(−) Gastos',f.gastosTot,'neg')+
         rowT('(=) Utilidad neta',f.utilidad)+
