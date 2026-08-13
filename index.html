@@ -226,7 +226,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <button class="btn bell" id="btnNotas" onclick="openNotas()"><span class="bell-ico">🔔</span> Pendientes<span class="dot" id="notasDot" style="display:none">0</span></button>
     <button class="btn" onclick="exportExcel()">Exportar Excel</button>
     <button class="btn" onclick="exportUltimos4()">Reporte últimos 4 días</button>
-    <button class="btn" onclick="openAjustes()">⚙ Ajustes iniciales</button>
+    <button class="btn" onclick="openMovs()">＋ Movimiento manual</button>
   </div>
 </header>
 
@@ -311,13 +311,14 @@ tr.has-debt{background:var(--artifact-red-soft)}
   <!-- RESUMEN -->
   <section class="view" id="resumen">
     <div class="kpis">
-      <div class="kpi accent"><div class="lbl">Total generado</div><div class="val" id="kTotal">$0</div><div class="sub">lavados + parqueadero</div></div>
-      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">caja + deudas pend. + cobros efectivo − gastos efectivo − vales efectivo</div></div>
+      <div class="kpi accent"><div class="lbl">Total generado</div><div class="val" id="kTotal">$0</div><div class="sub">lavados + parqueadero + deuda generada (bruto)</div></div>
+      <div class="kpi green"><div class="lbl">Ingreso negocio</div><div class="val" id="kBiz">$0</div><div class="sub">total generado − participación lavadores</div></div>
+      <div class="kpi amber"><div class="lbl">Participación lavadores</div><div class="val" id="kComm">$0</div><div class="sub">parte de los lavadores (comisión)</div></div>
+      <div class="kpi green"><div class="lbl">En efectivo (real)</div><div class="val" id="kCash">$0</div><div class="sub">dinero físico en caja hoy (excluye deudas por cobrar)</div></div>
       <div class="kpi teal"><div class="lbl">En cuenta (real)</div><div class="val" id="kVirtual">$0</div><div class="sub">saldo real de la cuenta</div></div>
       <div class="kpi teal"><div class="lbl">Parqueadero</div><div class="val" id="kPark">$0</div><div class="sub">ingreso extra</div></div>
-      <div class="kpi amber"><div class="lbl">Lavadores</div><div class="val" id="kComm">$0</div><div class="sub">comisión total</div></div>
       <div class="kpi red"><div class="lbl">Gastos</div><div class="val" id="kExp">$0</div><div class="sub">pagos del negocio</div></div>
-      <div class="kpi"><div class="lbl">Utilidad negocio</div><div class="val" id="kNet">$0</div><div class="sub">total con deuda − todos los gastos (incluye arriendo)</div></div>
+      <div class="kpi"><div class="lbl">Utilidad neta</div><div class="val" id="kNet">$0</div><div class="sub">ingreso negocio − gastos</div></div>
       <div class="kpi accent"><div class="lbl">Ingresos por marketing</div><div class="val" id="kMkt">$0</div><div class="sub">clientes agendados por marketing</div></div>
     </div>
 
@@ -326,8 +327,11 @@ tr.has-debt{background:var(--artifact-red-soft)}
       <div class="kpi"><div class="lbl">Total sin deuda</div><div class="val" id="kNoDebt">$0</div><div class="sub">plata que tenemos hoy</div></div>
       <div class="kpi green"><div class="lbl">Total con deuda</div><div class="val" id="kWithDebt">$0</div><div class="sub">si pagan todo</div></div>
       <div class="kpi red"><div class="lbl">Nos falta (por cobrar)</div><div class="val" id="kDebt">$0</div><div class="sub">deudas no pagadas</div></div>
-      <div class="kpi green"><div class="lbl">Efectivo físico ahora</div><div class="val" id="kCashNow">$0</div><div class="sub">lo que hay en caja hoy (efectivo real − deudas por cobrar)</div></div>
+      <div class="kpi green"><div class="lbl">Efectivo físico ahora</div><div class="val" id="kCashNow">$0</div><div class="sub">dinero físico en caja hoy (igual al efectivo real)</div></div>
     </div>
+
+    <h3 class="section-title" style="font-size:1rem;margin:0 0 12px">Conciliación (diagnóstico)</h3>
+    <div class="card" id="reconBox" style="margin-bottom:24px"></div>
 
     <div class="grid-2">
       <div class="card"><h3>Total generado por día</h3><div class="chart" id="chartDay"></div></div>
@@ -508,53 +512,27 @@ tr.has-debt{background:var(--artifact-red-soft)}
   </div>
 </div>
 
-<!-- MODAL AJUSTES INICIALES -->
-<div class="modal-back" id="ajustesModal">
-  <div class="modal">
-    <h3>⚙ Ajustes iniciales</h3>
-    <p class="sub">Estos valores se guardan en la nube (Firebase) y afectan TODOS los cálculos en tiempo real. Al cambiar uno, se recalculan efectivo, cuenta, utilidad y los totales. Son para cuadrar el arranque; cuando quieras, ponlos en 0.</p>
-    <form id="ajustesForm">
-      <label class="field">Descuento fijo del EFECTIVO (vales + insumos que salieron de la caja)<input type="text" inputmode="numeric" id="aEfectivo" placeholder="0" autocomplete="off"></label>
-      <label class="field">Ajuste inicial de la CUENTA (virtual)<input type="text" inputmode="numeric" id="aCuenta" placeholder="0" autocomplete="off"></label>
-      <label class="field">Umbral de gasto extraordinario (arriendo no pagado)<input type="text" inputmode="numeric" id="aUmbral" placeholder="2.000.000" autocomplete="off"></label>
-      <p class="sub" id="aInfo" style="margin:0"></p>
+<!-- MODAL MOVIMIENTOS MANUALES -->
+<div class="modal-back" id="movsModal">
+  <div class="modal" style="max-width:580px">
+    <h3 id="movsTitle">＋ Movimiento manual</h3>
+    <p class="sub">Registra un ingreso o gasto real que no viene de un cierre (venta de producto, compra de insumos, etc.). Se guarda como transacción independiente y el motor lo suma a efectivo/cuenta, total generado, gastos y utilidad. No modifica cierres ni deudas y no genera participación de lavadores (100% negocio).</p>
+    <form id="movsForm">
+      <input type="hidden" id="mvId">
+      <div class="entry" style="grid-template-columns:1fr 1fr">
+        <label class="field">Tipo<select id="mvType"><option value="ingreso">Ingreso</option><option value="gasto">Gasto</option></select></label>
+        <label class="field">Medio de pago<select id="mvMethod"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta</option></select></label>
+      </div>
+      <label class="field">Concepto<input id="mvConcept" placeholder="Venta de shampoo, compra de detergente..." autocomplete="off"></label>
+      <label class="field">Monto<input type="text" inputmode="numeric" id="mvAmount" placeholder="0" autocomplete="off"></label>
+      <label class="field">Fecha<input type="date" id="mvDate"></label>
+      <label class="field">Observación (opcional)<input id="mvNote" placeholder="Detalle adicional..." autocomplete="off"></label>
       <div class="row">
-        <button type="button" class="btn ghost" onclick="closeAjustes()">Cancelar</button>
-        <button type="submit" class="btn primary">Guardar (tiempo real)</button>
+        <button type="button" class="btn ghost" onclick="closeMovs()">Cerrar</button>
+        <button type="submit" class="btn primary" id="mvSaveBtn">Guardar movimiento</button>
       </div>
     </form>
-  </div>
-</div>
-
-<!-- MODAL COBRO ADICIONAL -->
-<div class="modal-back" id="cobroExtraModal">
-  <div class="modal">
-    <h3>Cobro adicional</h3>
-    <p class="sub">Suma un ingreso extra a la caja o a la cuenta. Solo mueve el total; no registra la transacción en ningún día.</p>
-    <form id="cobroExtraForm">
-      <label class="field">Valor<input type="text" inputmode="numeric" id="ceValue" placeholder="0" required autocomplete="off"></label>
-      <label class="field">¿Cómo entró?<select id="ceMethod"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta (virtual)</option></select></label>
-      <div class="row">
-        <button type="button" class="btn ghost" onclick="closeCobroExtra()">Cancelar</button>
-        <button type="submit" class="btn primary">Aplicar cobro</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL GASTO OCASIONAL -->
-<div class="modal-back" id="gastoOcModal">
-  <div class="modal">
-    <h3>Gasto ocasional</h3>
-    <p class="sub">Descuenta un gasto de la caja o de la cuenta. Solo mueve el total; no registra la transacción en ningún día.</p>
-    <form id="gastoOcForm">
-      <label class="field">Valor<input type="text" inputmode="numeric" id="goValue" placeholder="0" required autocomplete="off"></label>
-      <label class="field">¿De dónde salió?<select id="goMethod"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta (virtual)</option></select></label>
-      <div class="row">
-        <button type="button" class="btn ghost" onclick="closeGastoOcasional()">Cancelar</button>
-        <button type="submit" class="btn primary">Aplicar gasto</button>
-      </div>
-    </form>
+    <div style="margin-top:16px;max-height:300px;overflow:auto" id="movsList"></div>
   </div>
 </div>
 
@@ -578,7 +556,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot }
+import { getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 /* ================= FIREBASE ================= */
@@ -621,7 +599,8 @@ let vales = [];                                        // adelantos (vales) entr
 let notas = [];                                        // notas de administradores (revisión fin de mes)
 let ajustes = { efectivo:1530000, cuenta:285000, umbralExtra:2000000 };  // ajustes editables (Firebase config/ajustes)
 let charts = {};
-let extra={incomeCash:0,incomeCard:0,expenseCash:0,expenseCard:0};  // cobros adicionales / gastos ocasionales (ajuste directo, sin registrar transacción)
+let extra={incomeCash:0,incomeCard:0,expenseCash:0,expenseCard:0};  // cobros adicionales / gastos ocasionales legacy (ya sin botón; datos preservados y leídos por el motor)
+let movimientos = [];   // ingresos/gastos manuales (Firebase col 'movimientos'): transacciones reales independientes de los cierres
 
 /* ---------- per-day math ---------- */
 const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;  // cualquier valor (texto o número) -> número
@@ -630,7 +609,8 @@ const park  = d => num(d.park);
 const total = d => wash(d)+park(d);
 const comm  = d => wash(d)*(d.commPct??commPct)/100 + park(d)*num(d.parkPct)/100;  // lavadores
 const biz   = d => total(d)-comm(d);                                               // negocio
-const net   = d => biz(d)-num(d.expense);                                          // utilidad neta
+const partDebt = d => shTot(d)*((d.commPct??commPct)/100);                          // participación lavadores sobre deuda compartida GENERADA (Sección 17)
+const net   = d => biz(d)+(shTot(d)-partDebt(d))+ntTot(d)-num(d.expense);           // utilidad neta = negocio(lavados/parq) + parte negocio de deuda compartida (65%) + deuda 100% negocio − gastos
 const debt  = d => num(d.debt);                                                    // deuda original registrada
 const mktVal = d => d.mkt ? num(d.mktValue) : 0;                                    // ingreso atribuido a marketing ese día
 /* --- gastos por método (para descontar de la caja/cuenta correcta). Gasto antiguo sin método -> pendiente, no se descuenta hasta asignarlo. */
@@ -734,6 +714,15 @@ onSnapshot(doc(db,"config","ajustesExtra"),
   snap => { if(snap.exists()) extra={incomeCash:num(snap.data().incomeCash),incomeCard:num(snap.data().incomeCard),expenseCash:num(snap.data().expenseCash),expenseCard:num(snap.data().expenseCard)}; renderKpis(); },
   () => {}
 );
+/* movimientos manuales (ingresos/gastos adicionales) — transacciones reales, procesadas por el motor */
+onSnapshot(collection(db, "movimientos"),
+  snap => {
+    movimientos = snap.docs.map(x => ({ id:x.id, ...x.data() }));
+    renderAll();
+    if(document.getElementById('movsModal') && document.getElementById('movsModal').classList.contains('open')) renderMovsList();
+  },
+  () => {}
+);
 /* registros de vales (adelantos a lavadores) */
 onSnapshot(collection(db, "vales"),
   snap => {
@@ -762,7 +751,6 @@ onSnapshot(doc(db, "config", "ajustes"),
       };
     }
     renderAll();
-    if(document.getElementById('ajustesModal') && document.getElementById('ajustesModal').classList.contains('open')) fillAjustes();
   },
   () => {}
 );
@@ -1178,41 +1166,6 @@ document.getElementById('valeForm').onsubmit=async e=>{
 };
 window.openVale=openVale; window.closeVale=closeVale;
 
-/* ---------- Cobro adicional / Gasto ocasional (ajuste directo a caja/cuenta, no registra transacción) ---------- */
-function openCobroExtra(){ ceValue.value=''; document.getElementById('ceMethod').value='efectivo'; document.getElementById('cobroExtraModal').classList.add('open'); }
-function closeCobroExtra(){ document.getElementById('cobroExtraModal').classList.remove('open'); }
-document.getElementById('cobroExtraModal').addEventListener('click',e=>{ if(e.target.id==='cobroExtraModal') closeCobroExtra(); });
-document.getElementById('cobroExtraForm').onsubmit=async e=>{
-  e.preventDefault();
-  const val=numVal(ceValue); if(val<=0){ alert('Ingresa el valor del cobro.'); return; }
-  const virt=document.getElementById('ceMethod').value==='virtual';
-  try{
-    await setDoc(doc(db,'config','ajustesExtra'),{
-      incomeCash:num(extra.incomeCash)+(virt?0:val),
-      incomeCard:num(extra.incomeCard)+(virt?val:0),
-      expenseCash:num(extra.expenseCash), expenseCard:num(extra.expenseCard), updatedAt:Date.now()
-    },{merge:true});
-    closeCobroExtra();
-  }catch(err){ alert('No se pudo aplicar el cobro: '+err.message); }
-};
-function openGastoOcasional(){ goValue.value=''; document.getElementById('goMethod').value='efectivo'; document.getElementById('gastoOcModal').classList.add('open'); }
-function closeGastoOcasional(){ document.getElementById('gastoOcModal').classList.remove('open'); }
-document.getElementById('gastoOcModal').addEventListener('click',e=>{ if(e.target.id==='gastoOcModal') closeGastoOcasional(); });
-document.getElementById('gastoOcForm').onsubmit=async e=>{
-  e.preventDefault();
-  const val=numVal(goValue); if(val<=0){ alert('Ingresa el valor del gasto.'); return; }
-  const virt=document.getElementById('goMethod').value==='virtual';
-  try{
-    await setDoc(doc(db,'config','ajustesExtra'),{
-      incomeCash:num(extra.incomeCash), incomeCard:num(extra.incomeCard),
-      expenseCash:num(extra.expenseCash)+(virt?0:val),
-      expenseCard:num(extra.expenseCard)+(virt?val:0), updatedAt:Date.now()
-    },{merge:true});
-    closeGastoOcasional();
-  }catch(err){ alert('No se pudo aplicar el gasto: '+err.message); }
-};
-window.openCobroExtra=openCobroExtra; window.closeCobroExtra=closeCobroExtra;
-window.openGastoOcasional=openGastoOcasional; window.closeGastoOcasional=closeGastoOcasional;
 
 /* ================= NOTAS (administradores) ================= */
 function unseenNotas(){ return notas.filter(n=>!n.seen).length; }
@@ -1253,24 +1206,78 @@ async function markNotesSeen(){
 }
 window.openNotas=openNotas; window.closeNotas=closeNotas; window.markNotesSeen=markNotesSeen;
 
-/* ================= AJUSTES INICIALES (editables, Firebase) ================= */
-['aEfectivo','aCuenta','aUmbral'].forEach(attachSep);
-function fillAjustes(){
-  document.getElementById('aEfectivo').value=sep(ajustes.efectivo||0);
-  document.getElementById('aCuenta').value=sep(ajustes.cuenta||0);
-  document.getElementById('aUmbral').value=sep(ajustes.umbralExtra||0);
-  const el=document.getElementById('aInfo'); if(el) el.textContent='Efectivo se descuenta '+fmt(ajustes.efectivo||0)+' · Cuenta suma '+fmt(ajustes.cuenta||0)+' · Gasto extraordinario > '+fmt(ajustes.umbralExtra||0)+'.';
+/* ================= MOVIMIENTOS MANUALES (ingresos/gastos adicionales, Firebase col 'movimientos') =================
+   Cada movimiento es una TRANSACCIÓN REAL e independiente (no toca cierres ni deudas).
+   100% negocio: no genera participación de lavadores. El motor (calcFin) lo consolida. */
+attachSep('mvAmount');
+function movResetForm(){
+  document.getElementById('mvId').value='';
+  document.getElementById('mvType').value='ingreso';
+  document.getElementById('mvMethod').value='efectivo';
+  document.getElementById('mvConcept').value='';
+  document.getElementById('mvAmount').value='';
+  document.getElementById('mvNote').value='';
+  document.getElementById('mvDate').valueAsDate=new Date();
+  document.getElementById('mvSaveBtn').textContent='Guardar movimiento';
+  document.getElementById('movsTitle').textContent='＋ Movimiento manual';
 }
-function openAjustes(){ if(!requirePass()) return; fillAjustes(); document.getElementById('ajustesModal').classList.add('open'); }
-function closeAjustes(){ document.getElementById('ajustesModal').classList.remove('open'); }
-document.getElementById('ajustesModal').addEventListener('click',e=>{ if(e.target.id==='ajustesModal') closeAjustes(); });
-document.getElementById('ajustesForm').onsubmit=async e=>{
+function openMovs(){ if(!requirePass()) return; movResetForm(); renderMovsList(); document.getElementById('movsModal').classList.add('open'); }
+function closeMovs(){ document.getElementById('movsModal').classList.remove('open'); }
+document.getElementById('movsModal').addEventListener('click',e=>{ if(e.target.id==='movsModal') closeMovs(); });
+function editMov(id){
+  const m=movimientos.find(x=>x.id===id); if(!m){ alert('Movimiento no encontrado.'); return; }
+  document.getElementById('mvId').value=m.id;
+  document.getElementById('mvType').value=(m.tipo==='gasto')?'gasto':'ingreso';
+  document.getElementById('mvMethod').value=(m.medio==='virtual')?'virtual':'efectivo';
+  document.getElementById('mvConcept').value=m.concepto||'';
+  document.getElementById('mvAmount').value=sep(m.monto||0);
+  document.getElementById('mvNote').value=m.obs||'';
+  document.getElementById('mvDate').value=m.fecha||new Date().toISOString().slice(0,10);
+  document.getElementById('mvSaveBtn').textContent='Actualizar movimiento';
+  document.getElementById('movsTitle').textContent='✎ Editar movimiento';
+}
+async function deleteMov(id){
+  const m=movimientos.find(x=>x.id===id); if(!m) return;
+  if(!confirm('¿Eliminar este movimiento manual?\n\n'+(m.tipo==='gasto'?'Gasto':'Ingreso')+' · '+fmt(num(m.monto))+' · '+(m.medio==='virtual'?'tarjeta/cuenta':'efectivo')+'\n\nSe revertirá su impacto en efectivo/cuenta, total generado, gastos y utilidad. Solo afecta este movimiento manual; NO toca cierres ni deudas.')) return;
+  try{ await deleteDoc(doc(db,'movimientos',id)); if(document.getElementById('mvId').value===id) movResetForm(); }
+  catch(err){ alert('No se pudo eliminar: '+err.message); }
+}
+document.getElementById('movsForm').onsubmit=async e=>{
   e.preventDefault();
-  const payload={ efectivo:numVal(document.getElementById('aEfectivo')), cuenta:numVal(document.getElementById('aCuenta')), umbralExtra:numVal(document.getElementById('aUmbral'))||2000000, updatedAt:Date.now() };
-  try{ await setDoc(doc(db,'config','ajustes'), payload, {merge:true}); closeAjustes(); }
-  catch(err){ alert('No se pudo guardar el ajuste: '+err.message); }
+  const tipo=document.getElementById('mvType').value==='gasto'?'gasto':'ingreso';
+  const medio=document.getElementById('mvMethod').value==='virtual'?'virtual':'efectivo';
+  const concepto=document.getElementById('mvConcept').value.trim();
+  const monto=numVal(document.getElementById('mvAmount'));
+  const fecha=document.getElementById('mvDate').value;
+  const obs=document.getElementById('mvNote').value.trim();
+  if(!concepto){ alert('Escribe el concepto del movimiento.'); return; }
+  if(monto<=0){ alert('El monto debe ser mayor que cero.'); return; }
+  if(!fecha){ alert('Selecciona la fecha del movimiento.'); return; }
+  const id=document.getElementById('mvId').value;
+  const payload={tipo,medio,concepto,monto,fecha,obs,source:'manual',updatedAt:Date.now()};
+  try{
+    if(id){ await setDoc(doc(db,'movimientos',id), payload, {merge:true}); }
+    else { payload.createdAt=Date.now(); await addDoc(collection(db,'movimientos'), payload); }
+    movResetForm();
+    alert('Movimiento registrado correctamente.\n\n'+(tipo==='gasto'?'Gasto':'Ingreso')+' · '+fmt(monto)+' · '+(medio==='virtual'?'tarjeta/cuenta':'efectivo')+' · '+fecha);
+  }catch(err){ alert('No se pudo guardar el movimiento: '+err.message); }
 };
-window.openAjustes=openAjustes; window.closeAjustes=closeAjustes;
+function renderMovsList(){
+  const box=document.getElementById('movsList'); if(!box) return;
+  const list=[...movimientos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.createdAt||0)-(a.createdAt||0));
+  if(!list.length){ box.innerHTML='<div class="empty">Aún no hay movimientos manuales.</div>'; return; }
+  box.innerHTML='<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th class="num">Monto</th><th>Medio</th><th></th></tr></thead><tbody>'+
+    list.map(m=>{
+      const ing=m.tipo!=='gasto';
+      return '<tr><td>'+(m.fecha||'')+'</td>'+
+        '<td class="'+(ing?'pos':'neg')+'">'+(ing?'Ingreso':'Gasto')+'</td>'+
+        '<td>'+((m.concepto||'').replace(/</g,'&lt;'))+(m.obs?'<span class="debt-who">'+(m.obs||'').replace(/</g,'&lt;')+'</span>':'')+'</td>'+
+        '<td class="num '+(ing?'pos':'neg')+'">'+(ing?'+':'−')+fmt(num(m.monto))+'</td>'+
+        '<td>'+(m.medio==='virtual'?'tarjeta/cuenta':'efectivo')+'</td>'+
+        '<td style="white-space:nowrap"><button type="button" class="mini-btn" onclick="editMov(\''+m.id+'\')">editar</button><button type="button" class="mini-btn red" onclick="deleteMov(\''+m.id+'\')">eliminar</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+window.openMovs=openMovs; window.closeMovs=closeMovs; window.editMov=editMov; window.deleteMov=deleteMov;
 
 /* ---------- render table ---------- */
 function debtCellHTML(d){
@@ -1314,51 +1321,151 @@ function renderDays(){
 }
 
 /* ---------- KPIs ---------- */
+/* ================= MOTOR FINANCIERO — FUENTE ÚNICA DE VERDAD =================
+   Todas las cifras (KPIs, conciliación) se derivan de aquí. Reglas aplicadas:
+   - La deuda NO es efectivo: el efectivo físico excluye las cuentas por cobrar (#6/#7/#18).
+   - El gasto reduce su medio de pago SEGÚN EL MÉTODO, sin umbral por monto (#8/#9/#22).
+   - "Total generado" incluye la deuda como venta a crédito; cobrarla NO re-suma (#11/#24).
+   - Sin método => el gasto no descuenta caja/cuenta y queda "pendiente de clasificar" (#16). */
+function calcFin(){
+  const A_EF = num(ajustes.efectivo);   // descuento fijo del EFECTIVO (pagos a lavadores + insumos históricos de la caja)
+  const A_CU = num(ajustes.cuenta);     // ajuste inicial de la CUENTA (virtual)
+
+  // ---- MOVIMIENTOS MANUALES (ingresos/gastos adicionales; 100% negocio, sin participación lavadores) ----
+  const mIncCash = movimientos.reduce((a,m)=>a+((m.tipo!=='gasto' && m.medio!=='virtual')?num(m.monto):0),0);
+  const mIncCard = movimientos.reduce((a,m)=>a+((m.tipo!=='gasto' && m.medio==='virtual')?num(m.monto):0),0);
+  const mExpCash = movimientos.reduce((a,m)=>a+((m.tipo==='gasto' && m.medio!=='virtual')?num(m.monto):0),0);
+  const mExpCard = movimientos.reduce((a,m)=>a+((m.tipo==='gasto' && m.medio==='virtual')?num(m.monto):0),0);
+  const mIncTot = mIncCash+mIncCard;   // ingresos manuales -> suman a Total generado e Ingreso negocio (100% negocio)
+  const mExpTot = mExpCash+mExpCard;   // gastos manuales -> suman a Gastos y bajan Utilidad
+
+  // ingresos base
+  const C   = days.reduce((a,d)=>a+num(d.cash),0);      // lavados en efectivo
+  const V   = days.reduce((a,d)=>a+num(d.virtual),0);   // lavados en cuenta
+  const lav = C+V;
+  const P   = days.reduce((a,d)=>a+park(d),0);          // parqueadero
+  const shGen = days.reduce((a,d)=>a+shTot(d),0);       // deuda compartida generada
+  const ntGen = days.reduce((a,d)=>a+ntTot(d),0);       // deuda 100% negocio generada
+  const deudaGen = shGen+ntGen;
+  const generado = lav + P + deudaGen + mIncTot;        // TOTAL GENERADO (venta a crédito + ingresos manuales)
+
+  // por cobrar (pendiente)
+  const shOut = days.reduce((a,d)=>a+sharedOut(d),0);
+  const ntOut = days.reduce((a,d)=>a+netOut(d),0);
+  const porCobrar = shOut+ntOut;
+
+  // cobros de deuda por método (mueven por cobrar -> caja/cuenta; NO re-suman a generado)
+  const colCash = cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
+  const colCard = cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
+
+  // deuda 100% negocio recibida EN el cierre (ya entró, no queda pendiente)
+  const netRecvCash = days.reduce((a,d)=>a+num(d.debtNetCash),0);
+  const netRecvCard = days.reduce((a,d)=>a+num(d.debtNetCard),0);
+
+  // parqueadero por método
+  const parkCash = days.reduce((a,d)=>a+num(d.parkCash),0);
+  const parkCard = days.reduce((a,d)=>a+num(d.parkCard),0);
+
+  // gastos por método: TODOS reducen su medio (sin umbral). Sin método => pendiente (no descuenta).
+  const expCash = days.reduce((a,d)=>a+expCashOf(d),0);
+  const expCard = days.reduce((a,d)=>a+expCardOf(d),0);
+  const gastosTot = days.reduce((a,d)=>a+num(d.expense),0) + mExpTot; // gasto contable total (cierres + gastos manuales) — afecta utilidad
+  const gastosSinMetodo = days.reduce((a,d)=>a+(expUnknown(d)?num(d.expense):0),0);
+
+  // vales (adelantos) por origen
+  const valeCash = vales.reduce((a,v)=>a+((v.source==='virtual')?0:num(v.amount)),0);
+  const valeCard = vales.reduce((a,v)=>a+((v.source==='virtual')?num(v.amount):0),0);
+
+  // ajustes extra legacy (visibles y trazables; ya no hay botones que los generen)
+  const exIncCash=num(extra.incomeCash), exIncCard=num(extra.incomeCard);
+  const exExpCash=num(extra.expenseCash), exExpCard=num(extra.expenseCard);
+
+  // EFECTIVO FÍSICO (sin deuda por cobrar)
+  const efectivo = C + colCash + netRecvCash + parkCash + exIncCash + mIncCash
+                   - expCash - valeCash - exExpCash - mExpCash - A_EF;
+  // CUENTA (virtual)
+  const cuenta   = V + colCard + netRecvCard + parkCard + exIncCard + mIncCard
+                   - expCard - valeCard - exExpCard - mExpCard + A_CU;
+
+  // comisiones (solo lavados+parqueadero; deuda compartida ver conciliación)
+  const comision = days.reduce((a,d)=>a+comm(d),0);                 // participación base (lavados+parqueadero)
+  const partDebtTot = days.reduce((a,d)=>a+shTot(d)*((num(d.commPct)||commPct)/100),0);  // participación sobre deuda compartida GENERADA (Sección 17)
+  const partLav = comision + partDebtTot;                          // PARTICIPACIÓN LAVADORES total (reconocida al generar, una sola vez)
+  const ingresoNegocio = generado - partLav;                       // INGRESO NEGOCIO = total generado − participación lavadores
+  // utilidad (definición ÚNICA) = ingreso negocio − gastos
+  const utilidad = ingresoNegocio - gastosTot;
+
+  const totalSinDeuda = efectivo + cuenta;
+  const totalConDeuda = efectivo + cuenta + porCobrar;
+  const marketing = days.reduce((a,d)=>a+mktVal(d),0);
+  const ingresado = generado - porCobrar;
+
+  return {A_EF,A_CU,C,V,lav,P,shGen,ntGen,deudaGen,generado,shOut,ntOut,porCobrar,
+    mIncCash,mIncCard,mExpCash,mExpCard,mIncTot,mExpTot,
+    colCash,colCard,netRecvCash,netRecvCard,parkCash,parkCard,expCash,expCard,
+    gastosTot,gastosSinMetodo,valeCash,valeCard,exIncCash,exIncCard,exExpCash,exExpCard,
+    efectivo,cuenta,comision,partDebtTot,partLav,ingresoNegocio,utilidad,totalSinDeuda,totalConDeuda,marketing,ingresado};
+}
+
 function renderKpis(){
-  // Ajuste fijo: se descuenta 815.000 del EFECTIVO (vales + insumos pagados de la caja).
-  // Se resta SIEMPRE del efectivo (real y fisico), independiente de lo que haya en la base.
-  // Ajustes editables desde el panel (guardados en Firebase config/ajustes). Se modifican en vivo.
-  const AJUSTE_EFECTIVO=num(ajustes.efectivo);   // se descuenta del efectivo (vales + insumos pagados de la caja)
-  const CUENTA_AJUSTE=num(ajustes.cuenta);       // ajuste inicial de la cuenta (virtual)
-  const UMBRAL_EXTRA=num(ajustes.umbralExtra)||2000000;   // gasto > umbral = extraordinario (arriendo no pagado)
-  const isExtra=d=>num(d.expense)>UMBRAL_EXTRA;              // dia con gasto extraordinario
-  const T=days.reduce((a,d)=>a+total(d),0), C=days.reduce((a,d)=>a+(d.cash||0),0), V=days.reduce((a,d)=>a+(d.virtual||0),0),
-        P=days.reduce((a,d)=>a+park(d),0), CM=days.reduce((a,d)=>a+comm(d),0),
-        NT=days.reduce((a,d)=>a+net(d),0), DBT=days.reduce((a,d)=>a+debtOut(d),0);
-  // deudas cobradas, separadas por método (efectivo va a caja, tarjeta va a virtual). Cobros antiguos sin método -> efectivo.
-  const colCash=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?0:num(c.amount)),0);
-  const colCard=cobros.reduce((a,c)=>a+((c.method==='tarjeta')?num(c.amount):0),0);
-  const ND=collectedNonShared();  // deudas NO compartidas ya cobradas = ganancia neta 100% del negocio
-  // Gastos OPERATIVOS (sin el extraordinario), separados por metodo. El extraordinario se excluye por completo.
-  const expC=days.reduce((a,d)=>a+(isExtra(d)?0:expCashOf(d)),0);   // gastos en efectivo (solo operativos)
-  const expV=days.reduce((a,d)=>a+(isExtra(d)?0:expCardOf(d)),0);   // gastos en tarjeta (solo operativos)
-  const gastosOper=days.reduce((a,d)=>a+(isExtra(d)?0:num(d.expense)),0);  // gastos mostrados (solo operativos)
-  const extraExp=days.reduce((a,d)=>a+(isExtra(d)?num(d.expense):0),0);    // gasto extraordinario excluido
-  // vales (adelantos): la plata sale de la caja/cuenta al ENTREGARLOS. Vale antiguo sin origen -> efectivo.
-  const valeCash=vales.reduce((a,v)=>a+((v.source==='virtual')?0:num(v.amount)),0);
-  const valeCard=vales.reduce((a,v)=>a+((v.source==='virtual')?num(v.amount):0),0);
-  // parqueadero por metodo (efectivo->caja, tarjeta->virtual)
-  const parkCash=days.reduce((a,d)=>a+num(d.parkCash),0), parkCard=days.reduce((a,d)=>a+num(d.parkCard),0);
-  // deuda 100% negocio recibida en el cierre (ya entro): suma a su caja + total + utilidad, sin comision
-  const netRecvCash=days.reduce((a,d)=>a+num(d.debtNetCash),0), netRecvCard=days.reduce((a,d)=>a+num(d.debtNetCard),0), netRecv=netRecvCash+netRecvCard;
-  // MISMA IDEA para TODOS los numeros: se computan naturalmente desde efectivo real + cuenta real.
-  // Cada movimiento (deuda/gasto/vale) afecta su propio lado (efectivo o virtual). El extraordinario no cuenta.
-  const cashReal   = C+colCash+DBT-expC-valeCash+parkCash+netRecvCash-AJUSTE_EFECTIVO+num(extra.incomeCash)-num(extra.expenseCash);  // efectivo real (incluye deudas por cobrar + parqueadero/100% en efectivo)
-  const virtualReal= V+colCard-expV-valeCard+parkCard+netRecvCard+CUENTA_AJUSTE+num(extra.incomeCard)-num(extra.expenseCard);         // cuenta real (virtual) + parqueadero/100% en tarjeta + ajuste inicial
-  const cashNow    = cashReal-DBT;                                 // efectivo fisico hoy (sin lo que aun deben)
-  // El gasto fijo (arriendo) AUN NO se paga: NO sale del efectivo ni de la cuenta, pero SI se cuenta
-  // como costo -> resta la utilidad y aparece en Gastos. NT ya resta todo el expense (incluido el fijo).
-  // La utilidad refleja la ganancia REAL: negocio - lavadores - gastos OPERATIVOS.
-  // El arriendo (extraordinario) AUN NO se paga, asi que NO baja la utilidad hasta pagarlo (se suma de vuelta).
-  // Utilidad = Total con deuda - TODOS los gastos que llevamos (incluye el arriendo/extraordinario).
-  const gastosTotales = gastosOper + extraExp;
-  const utilidad   = (cashReal+virtualReal) - gastosTotales;
-  kTotal.textContent=fmt(T+ND+netRecv); kCash.textContent=fmt(cashReal); kVirtual.textContent=fmt(virtualReal);
-  kPark.textContent=fmt(P); kComm.textContent=fmt(CM); kExp.textContent=fmt(gastosTotales); kNet.textContent=fmt(utilidad);
-  // Total sin deuda = plata que tenemos HOY (efectivo fisico + cuenta). Total con deuda = cuando paguen todo.
-  kNoDebt.textContent=fmt(cashNow+virtualReal); kWithDebt.textContent=fmt(cashReal+virtualReal); kDebt.textContent=fmt(DBT);
-  const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(cashNow);
-  const MK=days.reduce((a,d)=>a+mktVal(d),0); const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(MK);
+  const f=calcFin();
+  kTotal.textContent=fmt(f.generado);
+  kCash.textContent=fmt(f.efectivo);
+  kVirtual.textContent=fmt(f.cuenta);
+  kPark.textContent=fmt(f.P);
+  kComm.textContent=fmt(f.partLav);
+  const kb=document.getElementById('kBiz'); if(kb) kb.textContent=fmt(f.ingresoNegocio);
+  kExp.textContent=fmt(f.gastosTot);
+  kNet.textContent=fmt(f.utilidad);
+  kNoDebt.textContent=fmt(f.totalSinDeuda);
+  kWithDebt.textContent=fmt(f.totalConDeuda);
+  kDebt.textContent=fmt(f.porCobrar);
+  const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(f.efectivo);
+  const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(f.marketing);
+}
+
+/* ---------- Panel de conciliación (solo lectura; NO modifica datos) ---------- */
+function renderReconciliation(){
+  const box=document.getElementById('reconBox'); if(!box) return;
+  const f=calcFin();
+  const alerts=[];
+  if(f.gastosSinMetodo>0) alerts.push('Gastos sin método (pendiente de clasificar): '+fmt(f.gastosSinMetodo)+'. No se descuentan de caja ni cuenta hasta asignar el método (efectivo/tarjeta).');
+  let sinAsignar=0;
+  days.forEach(d=>{
+    if(sharedOut(d)>0 && !(d.debtWho||'').trim()) sinAsignar+=sharedOut(d);
+    if(netOut(d)>0 && !ntWho(d).trim()) sinAsignar+=netOut(d);
+  });
+  if(sinAsignar>0) alerts.push('Deuda por cobrar sin cliente asignado: '+fmt(sinAsignar)+'.');
+  if(f.partDebtTot>0) alerts.push('Participación de lavadores sobre deuda compartida reconocida en la utilidad: '+fmt(f.partDebtTot)+' (Sección 17: la deuda compartida reparte '+commPct+'% al lavador al generarse). Este monto todavía NO está asignado a un lavador específico en la pestaña Lavadores; esa asignación/pago se implementa en la 2ª entrega.');
+  if(f.exIncCash||f.exIncCard||f.exExpCash||f.exExpCard) alerts.push('Ajustes extra legacy activos (config/ajustesExtra): +ef '+fmt(f.exIncCash)+' · +cta '+fmt(f.exIncCard)+' · −ef '+fmt(f.exExpCash)+' · −cta '+fmt(f.exExpCard)+'. Ya no hay botón que los genere; revísalos.');
+  if(f.A_EF>0) alerts.push('Descuento fijo del EFECTIVO aplicado: '+fmt(f.A_EF)+' (cubre pagos a lavadores e insumos históricos pagados desde la caja).');
+  const rowT=(l,v,cls)=>'<tr><td>'+l+'</td><td class="num '+(cls||'')+'">'+fmt(v)+'</td></tr>';
+  box.innerHTML=
+    '<div class="grid-2" style="margin-bottom:4px">'+
+      '<div><table><thead><tr><th>Ingresos</th><th class="num">Valor</th></tr></thead><tbody>'+
+        rowT('Total generado',f.generado,'pos')+
+        rowT('· Lavados',f.lav)+
+        rowT('· Parqueadero',f.P)+
+        rowT('· Deuda generada (crédito)',f.deudaGen)+
+        rowT('· Ingresos manuales',f.mIncTot)+
+        rowT('Ya ingresado (generado − por cobrar)',f.ingresado)+
+        rowT('Por cobrar (cuentas por cobrar)',f.porCobrar,'neg')+
+      '</tbody></table></div>'+
+      '<div><table><thead><tr><th>Disponible / resultado</th><th class="num">Valor</th></tr></thead><tbody>'+
+        rowT('Efectivo físico (sin deuda)',f.efectivo,'pos')+
+        rowT('Cuenta (virtual)',f.cuenta,'pos')+
+        rowT('Total sin deuda',f.totalSinDeuda)+
+        rowT('Total con deuda',f.totalConDeuda)+
+        rowT('(−) Particip. lavadores (lavados+parq)',f.comision,'neg')+
+        rowT('(−) Particip. lavadores (deuda compart.)',f.partDebtTot,'neg')+
+        rowT('(=) Ingreso negocio',f.ingresoNegocio,'pos')+
+        rowT('(−) Gastos',f.gastosTot,'neg')+
+        rowT('(=) Utilidad neta',f.utilidad)+
+      '</tbody></table></div>'+
+    '</div>'+
+    (alerts.length
+      ? '<div class="hint" style="background:var(--artifact-red-soft)"><b>⚠ Conciliación / pendientes</b><ul style="margin:8px 0 0;padding-left:18px">'+alerts.map(a=>'<li style="margin-bottom:4px">'+a+'</li>').join('')+'</ul></div>'
+      : '<div class="hint"><b>✓ Sin inconsistencias detectadas.</b></div>');
 }
 
 /* ---------- lavadores: consolidado por lavador (pendiente + ya pagado) ----------
@@ -1548,7 +1655,7 @@ function renderWashChart(){
 window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c.resize()));
 
 function renderAll(){
-  refreshPctLabels(); renderKpis(); renderDays(); renderWashersDash();
+  refreshPctLabels(); renderKpis(); renderReconciliation(); renderDays(); renderWashersDash();
   if(document.getElementById('resumen').classList.contains('active')) renderCharts();
   if(document.getElementById('lavadores').classList.contains('active')) renderWashChart();
 }
@@ -1582,6 +1689,8 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(vrows.length?vrows:[{Fecha:'',Lavador:'',Valor:'',Origen:'',Nota:'',Estado:''}]),'Vales');
   const nrows=[...notas].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(n=>({Fecha:n.at||'',Autor:n.autor||'',Nota:n.text||'',Estado:n.seen?'vista':'nueva'}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(nrows.length?nrows:[{Fecha:'',Autor:'',Nota:'',Estado:''}]),'Notas');
+  const mrows=[...movimientos].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(m=>({Fecha:m.fecha||'',Tipo:(m.tipo==='gasto'?'Gasto':'Ingreso'),Concepto:m.concepto||'',Monto:num(m.monto),Medio:(m.medio==='virtual'?'tarjeta/cuenta':'efectivo'),Observación:m.obs||'',Fuente:'manual'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mrows.length?mrows:[{Fecha:'',Tipo:'',Concepto:'',Monto:'',Medio:'','Observación':'',Fuente:''}]),'Movimientos');
   XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 /* ---------- Reporte de VENTAS de los últimos 4 días ---------- */
@@ -1630,54 +1739,13 @@ function cleanUpAfterPrint(){document.querySelectorAll('[_echarts_instance_]').f
 window.addEventListener('beforeprint',()=>{document.querySelectorAll('.view').forEach(v=>v.style.display='block');prepareChartsForPrint();});
 window.addEventListener('afterprint',()=>{document.querySelectorAll('.view').forEach(v=>{v.style.display=v.classList.contains('active')?'block':'';});cleanUpAfterPrint();});
 
-/* ================= AJUSTE ÚNICO DE NÚMEROS (migración automática, corre 1 sola vez) =================
-   Deja los números acomodados en Firebase:
-   1) Efectivo (cash) de los días del reporte de Wix (Aug 3-7).
-   2) Todos los gastos sin método -> efectivo (se restan de la caja).
-   3) Todos los vales -> origen efectivo (salen de la caja, no de la tarjeta).
-   Queda una bandera en config/fixApplied para NO repetir. No toca deudas, ventas ni cuenta virtual. */
-let fixFlagLoaded=false, fixApplied=false, fixRunning=false, valesLoaded=false;
-const FIX_CASH_WIX = {
-  "2026-08-03": 319000,
-  "2026-08-04": 405000,
-  "2026-08-05": 120000,
-  "2026-08-06": 595000,
-  "2026-08-07": 155000
-};
-onSnapshot(doc(db,"config","fixApplied2"),
-  snap => { fixFlagLoaded=true; fixApplied=!!(snap.exists() && snap.data().done); maybeRunFix(); },
-  () => { fixFlagLoaded=true; }
-);
-async function maybeRunFix(){
-  if(fixApplied || fixRunning || !fixFlagLoaded) return;
-  if(!days.length || !valesLoaded) return;   // esperamos a que carguen días y vales
-  fixRunning=true;
-  try{
-    // 1) efectivo de los días de Wix
-    for(const [date,cash] of Object.entries(FIX_CASH_WIX)){
-      const d=days.find(x=>x.date===date);
-      if(d && num(d.cash)!==cash){ await setDoc(doc(db,COL_DAYS,date),{cash,updatedAt:Date.now()},{merge:true}); }
-    }
-    // Identificamos el gasto más grande: ese salió de TARJETA (no de la caja).
-    const withExp=days.filter(d=>num(d.expense)>0).sort((a,b)=>num(b.expense)-num(a.expense));
-    const bigDate=withExp.length?withExp[0].date:null;
-    // 2) gastos sin método -> efectivo, EXCEPTO el gasto más grande que va a tarjeta
-    for(const d of days){
-      const g=num(d.expense);
-      if(g<=0) continue;
-      if(d.date===bigDate){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"tarjeta",expCard:g,expCash:0,updatedAt:Date.now()},{merge:true}); }
-      else if(!d.expMethod){ await setDoc(doc(db,COL_DAYS,d.date),{expMethod:"efectivo",expCash:g,expCard:0,updatedAt:Date.now()},{merge:true}); }
-    }
-    // 3) vales -> origen efectivo
-    for(const v of vales){
-      if(v.source!=="efectivo"){ await setDoc(doc(db,"vales",v.id),{source:"efectivo",updatedAt:Date.now()},{merge:true}); }
-    }
-    await setDoc(doc(db,"config","fixApplied2"),{done:true,at:new Date().toISOString()},{merge:true});
-    fixApplied=true;
-    console.log("Ajuste único aplicado: efectivo Wix + gasto grande a tarjeta + resto de gastos a efectivo + vales a efectivo.");
-  }catch(err){ console.warn("No se pudo aplicar el ajuste único:",err.message); }
-  finally{ fixRunning=false; }
-}
+/* ================= MIGRACIÓN AUTOMÁTICA DESACTIVADA (reglas #15/#16/#41) =================
+   El bloque original (maybeRunFix + FIX_CASH_WIX) reescribía el efectivo histórico de 5
+   fechas y forzaba el método de gastos y el origen de vales en Firebase automáticamente.
+   Queda DESACTIVADO: no se ejecuta ninguna escritura automática sobre datos históricos.
+   No se revierte lo que esa migración pudiera haber escrito antes; solo se impide repetirla. */
+let valesLoaded=false;
+function maybeRunFix(){ /* desactivado a propósito: los históricos no se modifican automáticamente */ }
 
 /* ---------- init ---------- */
 initWashers();
