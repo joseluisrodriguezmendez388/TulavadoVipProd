@@ -642,7 +642,7 @@ let pagos = [];                                        // registros de pago a la
 let cobros = [];                                       // registros de cobro de deudas
 let vales = [];                                        // adelantos (vales) entregados a lavadores
 let notas = [];                                        // notas de administradores (revisión fin de mes)
-let ajustes = { efectivo:1530000, cuenta:285000, umbralExtra:2000000 };  // ajustes editables (Firebase config/ajustes)
+let ajustes = { efectivo:0, cuenta:0, umbralExtra:0 };  // montos fijos heredados NEUTRALIZADOS (los valores en Firebase se conservan pero ya no se aplican; ver calcFin)
 let charts = {};
 let extra={incomeCash:0,incomeCard:0,expenseCash:0,expenseCard:0};  // cobros adicionales / gastos ocasionales legacy (ya sin botón; datos preservados y leídos por el motor)
 let movimientos = [];   // ingresos/gastos manuales (Firebase col 'movimientos'): transacciones reales independientes de los cierres
@@ -795,9 +795,9 @@ onSnapshot(doc(db, "config", "ajustes"),
     if(snap.exists()){
       const a=snap.data();
       ajustes = {
-        efectivo: Number.isFinite(+a.efectivo)? +a.efectivo : 1530000,
-        cuenta:   Number.isFinite(+a.cuenta)?   +a.cuenta   : 285000,
-        umbralExtra: Number.isFinite(+a.umbralExtra)? +a.umbralExtra : 2000000
+        efectivo: Number.isFinite(+a.efectivo)? +a.efectivo : 0,
+        cuenta:   Number.isFinite(+a.cuenta)?   +a.cuenta   : 0,
+        umbralExtra: Number.isFinite(+a.umbralExtra)? +a.umbralExtra : 0
       };
     }
     renderAll();
@@ -1427,8 +1427,10 @@ function renderDays(){
    - "Total generado" incluye la deuda como venta a crédito; cobrarla NO re-suma (#11/#24).
    - Sin método => el gasto no descuenta caja/cuenta y queda "pendiente de clasificar" (#16). */
 function calcFin(){
-  const A_EF = num(ajustes.efectivo);   // descuento fijo del EFECTIVO (pagos a lavadores + insumos históricos de la caja)
-  const A_CU = num(ajustes.cuenta);     // ajuste inicial de la CUENTA (virtual)
+  const A_EF_STORED = num(ajustes.efectivo);   // valor histórico guardado en config/ajustes (NO se borra de Firebase)
+  const A_EF = 0;                       // DESACTIVADO por decisión del usuario: ya NO se resta el descuento fijo silencioso del EFECTIVO. Los gastos y pagos se contabilizan por cierre.
+  const A_CU_STORED = num(ajustes.cuenta);   // valor histórico guardado en config/ajustes (NO se borra de Firebase)
+  const A_CU = 0;                      // DESACTIVADO por decisión del usuario: ya NO se suma el ajuste fijo silencioso a la CUENTA. Los ingresos/gastos de cuenta se contabilizan por cierre y movimientos.
 
   // ---- MOVIMIENTOS MANUALES (ingresos/gastos adicionales; 100% negocio, sin participación lavadores) ----
   const mIncCash = movimientos.reduce((a,m)=>a+((m.tipo!=='gasto' && m.medio!=='virtual')?num(m.monto):0),0);
@@ -1521,7 +1523,7 @@ function calcFin(){
   const marketing = days.reduce((a,d)=>a+mktVal(d),0);
   const ingresado = generado - porCobrar;
 
-  return {A_EF,A_CU,C,V,lav,P,shGen,ntGen,deudaGen,generado,shOut,ntOut,porCobrar,
+  return {A_EF,A_EF_STORED,A_CU,A_CU_STORED,C,V,lav,P,shGen,ntGen,deudaGen,generado,shOut,ntOut,porCobrar,
     mIncCash,mIncCard,mExpCash,mExpCard,mIncTot,mExpTot,
     colCash,colCard,netRecvCash,netRecvCard,parkCash,parkCard,expCash,expCard,
     gastosTot,gastosSinMetodo,valeCash,valeCard,exIncCash,exIncCard,exExpCash,exExpCard,
@@ -1559,7 +1561,8 @@ function renderReconciliation(){
   if(sinAsignar>0) alerts.push('Deuda por cobrar sin cliente asignado: '+fmt(sinAsignar)+'.');
   if(f.shOut>0) alerts.push('Deuda compartida embebida en la caja del cierre: pendiente '+fmt(f.shOut)+'. Ya está RESTADA del efectivo físico (queda fuera del disponible hasta que se cobre). Al cobrarla, decides si entra por efectivo o por cuenta.');
   if(f.exIncCash||f.exIncCard||f.exExpCash||f.exExpCard) alerts.push('Ajustes extra legacy activos (config/ajustesExtra): +ef '+fmt(f.exIncCash)+' · +cta '+fmt(f.exIncCard)+' · −ef '+fmt(f.exExpCash)+' · −cta '+fmt(f.exExpCard)+'. Ya no hay botón que los genere; revísalos.');
-  if(f.A_EF>0) alerts.push('Descuento fijo del EFECTIVO aplicado: '+fmt(f.A_EF)+' (cubre pagos a lavadores e insumos históricos pagados desde la caja).');
+  if(f.A_EF_STORED>0) alerts.push('Descuento fijo del EFECTIVO DESACTIVADO: había un valor histórico de '+fmt(f.A_EF_STORED)+' que ya NO se resta del efectivo (el dato se conserva en config/ajustes pero no se aplica). Los gastos y pagos se contabilizan por cierre.');
+  if(f.A_CU_STORED>0) alerts.push('Ajuste fijo de la CUENTA DESACTIVADO: había un valor histórico de '+fmt(f.A_CU_STORED)+' que ya NO se suma a la cuenta (el dato se conserva en config/ajustes pero no se aplica). Los ingresos y gastos de cuenta se contabilizan por cierre.');
   if(f.cashAdj!==0||f.bankAdj!==0) alerts.push('Conciliación manual activa (Administración de cuenta): ajuste efectivo '+fmt(f.cashAdj)+' · ajuste cuenta '+fmt(f.bankAdj)+'. Fija el saldo real como punto de partida; NO afecta utilidad ni total generado.');
   const rowT=(l,v,cls)=>'<tr><td>'+l+'</td><td class="num '+(cls||'')+'">'+fmt(v)+'</td></tr>';
   box.innerHTML=
