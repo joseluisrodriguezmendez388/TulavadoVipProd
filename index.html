@@ -266,9 +266,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
           <label class="field debt netd" id="fDebtNetReasonWrap" style="display:none">¿Cuál fue? (motivo)<input id="fDebtNetReason" placeholder="Parqueadero, venta..." autocomplete="off"></label>
           <label class="field debt netd" id="fDebtNetValueWrap" style="display:none">Valor (100% del negocio)<input type="text" inputmode="numeric" id="fDebtNetValue" placeholder="0" autocomplete="off"></label>
           <label class="field debt netd" id="fDebtNetWhoWrap" style="display:none">¿Quién debe / a quién se le cobra?<input id="fDebtNetWho" placeholder="Nombre..." autocomplete="off"></label>
-          <label class="field netd" id="fDebtNetMethodWrap" style="display:none">¿Cómo entró esta plata?<select id="fDebtNetMethod"><option value="efectivo">Efectivo (caja)</option><option value="virtual">Tarjeta / cuenta (virtual)</option><option value="combinado">Combinado</option></select></label>
-          <label class="field netd" id="fDebtNetCashWrap" style="display:none">Entró en efectivo<input type="text" inputmode="numeric" id="fDebtNetCash" placeholder="0" autocomplete="off"></label>
-          <label class="field netd" id="fDebtNetCardWrap" style="display:none">Entró en tarjeta<input type="text" inputmode="numeric" id="fDebtNetCard" placeholder="0" autocomplete="off"></label>
+          <label class="field netd" id="fDebtNetInfoWrap" style="display:none;font-weight:400"><span style="font-size:.78rem;color:var(--artifact-text-soft);line-height:1.4">Esta deuda 100% del negocio queda <b>pendiente por cobrar</b>: suma a la utilidad y a "Nos falta por cobrar", pero <b>no entra a caja ni a cuenta</b> todavía. Cuando la cobres (botón "Cobrar deuda") eliges si entró en efectivo o en cuenta.</span></label>
           <label class="field"><span class="chk-row"><input type="checkbox" id="fMkt"> ¿Cliente agendado por marketing?</span></label>
           <label class="field mkt-wrap" id="fMktWrap">Valor por marketing<input type="text" inputmode="numeric" id="fMktValue" placeholder="0" autocomplete="off"></label>
         </div>
@@ -882,10 +880,8 @@ document.getElementById('addWasher').onclick=()=>{ addWasherRow(); syncRosterFro
 function toggleMkt(){ document.getElementById('fMktWrap').classList.toggle('show', document.getElementById('fMkt').checked); }
 document.getElementById('fMkt').addEventListener('change',toggleMkt);
 /* ---------- deuda 100% negocio: mostrar campos motivo/valor/quien cuando esta marcada ---------- */
-function toggleDebtNet(){ const on=document.getElementById('fDebtNet').checked; ['fDebtNetReasonWrap','fDebtNetValueWrap','fDebtNetWhoWrap','fDebtNetMethodWrap'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=on?'flex':'none';}); toggleDebtNetMethod(); }
-function toggleDebtNetMethod(){ const on=document.getElementById('fDebtNet').checked; const comb=on && document.getElementById('fDebtNetMethod').value==='combinado'; document.getElementById('fDebtNetCashWrap').style.display=comb?'flex':'none'; document.getElementById('fDebtNetCardWrap').style.display=comb?'flex':'none'; }
+function toggleDebtNet(){ const on=document.getElementById('fDebtNet').checked; ['fDebtNetReasonWrap','fDebtNetValueWrap','fDebtNetWhoWrap','fDebtNetInfoWrap'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=on?'flex':'none';}); }
 document.getElementById('fDebtNet').addEventListener('change',toggleDebtNet);
-document.getElementById('fDebtNetMethod').addEventListener('change',toggleDebtNetMethod);
 function toggleExpMethod(){ const comb=document.getElementById('fExpMethod').value==='combinado'; document.getElementById('fExpCashWrap').style.display=comb?'flex':'none'; document.getElementById('fExpCardWrap').style.display=comb?'flex':'none'; }
 function togglePark(){ const comb=document.getElementById('pMethod').value==='combinado'; document.getElementById('pCashWrap').style.display=comb?'flex':'none'; document.getElementById('pCardWrap').style.display=comb?'flex':'none'; }
 document.getElementById('pMethod').addEventListener('change',togglePark);
@@ -907,7 +903,7 @@ document.getElementById('fDate').addEventListener('change',()=>{
     const nAmt=legacyNet?num(ex.debt):num(ex.debtNet);
     document.getElementById('fDebtNet').checked=nAmt>0;
     fDebtNetValue.value=nAmt?sep(nAmt):''; fDebtNetReason.value=ntReason(ex); fDebtNetWho.value=ntWho(ex);
-    document.getElementById('fDebtNetMethod').value=ex.debtNetMethod||'efectivo'; fDebtNetCash.value=ex.debtNetCash?sep(ex.debtNetCash):''; fDebtNetCard.value=ex.debtNetCard?sep(ex.debtNetCard):''; toggleDebtNet();
+    toggleDebtNet();
     document.getElementById('fMkt').checked=!!ex.mkt; fMktValue.value=ex.mktValue?sep(ex.mktValue):''; toggleMkt();
     initWashers(ex.washers);
     updateWashCheck();
@@ -933,13 +929,10 @@ document.getElementById('entryForm').onsubmit=async e=>{
   const mktOn=document.getElementById('fMkt').checked;
   if(mktOn && numVal(fMktValue)<=0){ alert('Marcaste que hubo cliente por marketing. Escribe el valor de marketing.'); return; }
   const netOn=document.getElementById('fDebtNet').checked;
-  let netVal=0, netCash=0, netCard=0, netMethod='';
+  let netVal=0;
   if(netOn){
     netVal=numVal(fDebtNetValue);
     if(netVal<=0){ alert('Marcaste que hay una deuda 100% del negocio. Escribe el valor de esa deuda.'); return; }
-    netMethod=document.getElementById('fDebtNetMethod').value;
-    if(netMethod==='efectivo'){ netCash=netVal; } else if(netMethod==='virtual'){ netCard=netVal; }
-    else { netCash=numVal(fDebtNetCash); netCard=numVal(fDebtNetCard); if(netCash+netCard!==netVal){ alert('El 100% negocio combinado no cuadra.\n\nEfectivo ('+fmt(netCash)+') + Tarjeta ('+fmt(netCard)+') debe ser igual al valor ('+fmt(netVal)+').'); return; } }
   }
   const expTot=numVal(fExpense);
   const expM=document.getElementById('fExpMethod').value;
@@ -955,7 +948,7 @@ document.getElementById('entryForm').onsubmit=async e=>{
     debt:numVal(fDebt),debtWho:fDebtWho.value.trim(),
     debtShared:true,
     debtNet:netVal, debtNetWho:netOn?fDebtNetWho.value.trim():'', debtNetReason:netOn?fDebtNetReason.value.trim():'',
-    debtNetMethod:netMethod, debtNetCash:netCash, debtNetCard:netCard, debtNetPaid:netVal,
+    debtNetMethod:'', debtNetCash:0, debtNetCard:0, debtNetPaid:0,   /* 100% negocio queda PENDIENTE: no toca caja/cuenta; se cobra con "Cobrar deuda" */
     mkt:mktOn, mktValue:mktOn?numVal(fMktValue):0,
     washers, commPct:commPct};
   try{
@@ -963,7 +956,7 @@ document.getElementById('entryForm').onsubmit=async e=>{
     syncRosterFromForm();   // guarda los nombres de los lavadores como lista fija
     fCash.value='';fVirtual.value='';fExpense.value='';fNote.value='';fDebt.value='';fDebtWho.value='';
     document.getElementById('fExpMethod').value=''; fExpCash.value=''; fExpCard.value=''; toggleExpMethod();
-    document.getElementById('fDebtNet').checked=false; fDebtNetValue.value=''; fDebtNetReason.value=''; fDebtNetWho.value=''; document.getElementById('fDebtNetMethod').value='efectivo'; fDebtNetCash.value=''; fDebtNetCard.value=''; toggleDebtNet();
+    document.getElementById('fDebtNet').checked=false; fDebtNetValue.value=''; fDebtNetReason.value=''; fDebtNetWho.value=''; toggleDebtNet();
     document.getElementById('fMkt').checked=false; fMktValue.value=''; toggleMkt();
     loadedFromExisting=null;
     initWashers();
@@ -1586,10 +1579,7 @@ function renderReconciliation(){
         rowT('(−) Gastos',f.gastosTot,'neg')+
         rowT('(=) Utilidad neta',f.utilidad)+
       '</tbody></table></div>'+
-    '</div>'+
-    (alerts.length
-      ? '<div class="hint" style="background:var(--artifact-red-soft)"><b>⚠ Conciliación / pendientes</b><ul style="margin:8px 0 0;padding-left:18px">'+alerts.map(a=>'<li style="margin-bottom:4px">'+a+'</li>').join('')+'</ul></div>'
-      : '<div class="hint"><b>✓ Sin inconsistencias detectadas.</b></div>');
+    '</div>';
 }
 
 /* ---------- lavadores: consolidado por lavador (pendiente + ya pagado) ----------
