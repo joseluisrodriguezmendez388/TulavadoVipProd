@@ -227,6 +227,7 @@ tr.has-debt{background:var(--artifact-red-soft)}
     <button class="btn" onclick="exportExcel()">Exportar Excel</button>
     <button class="btn" onclick="exportUltimos4()">Reporte últimos 4 días</button>
     <button class="btn" onclick="openMovs()">＋ Movimiento manual</button>
+    <button class="btn" onclick="openAdmin()">🏦 Administración de cuenta</button>
   </div>
 </header>
 
@@ -536,6 +537,50 @@ tr.has-debt{background:var(--artifact-red-soft)}
   </div>
 </div>
 
+<!-- MODAL ADMINISTRACIÓN DE CUENTA (conciliación manual de saldos) -->
+<div class="modal-back" id="adminModal">
+  <div class="modal" style="max-width:640px">
+    <h3>🏦 Administración de cuenta</h3>
+    <p class="sub">Concilia el saldo REAL de tu efectivo y tu cuenta con lo que el sistema calcula. La conciliación se guarda como registro independiente: NO modifica cierres, deudas ni movimientos. Funciona como punto de partida real; las operaciones nuevas se acumulan desde ahí. No inventa ingresos ni gastos y no cambia la utilidad ni el total generado.</p>
+    <div class="entry" style="grid-template-columns:1fr 1fr">
+      <label class="field">Fecha<input type="date" id="admDate"></label>
+      <label class="field">Observación (opcional)<input id="admObs" placeholder="Motivo o detalle..." autocomplete="off"></label>
+    </div>
+    <div class="grid-2" style="margin-top:8px">
+      <div class="card" style="box-shadow:none">
+        <h3>Efectivo</h3>
+        <table><tbody>
+          <tr><td>Calculado</td><td class="num" id="admCashCalc">$0</td></tr>
+          <tr><td>Real</td><td class="num"><input type="text" inputmode="numeric" id="admCashReal" placeholder="0" autocomplete="off" style="width:150px;text-align:right"></td></tr>
+          <tr><td>Diferencia</td><td class="num" id="admCashDiff">$0</td></tr>
+        </tbody></table>
+        <button type="button" class="btn primary" style="width:100%;justify-content:center;margin-top:8px" onclick="reconcile('cash')">Conciliar efectivo</button>
+      </div>
+      <div class="card" style="box-shadow:none">
+        <h3>Cuenta / tarjeta</h3>
+        <table><tbody>
+          <tr><td>Calculado</td><td class="num" id="admBankCalc">$0</td></tr>
+          <tr><td>Real</td><td class="num"><input type="text" inputmode="numeric" id="admBankReal" placeholder="0" autocomplete="off" style="width:150px;text-align:right"></td></tr>
+          <tr><td>Diferencia</td><td class="num" id="admBankDiff">$0</td></tr>
+        </tbody></table>
+        <button type="button" class="btn primary" style="width:100%;justify-content:center;margin-top:8px" onclick="reconcile('bank')">Conciliar cuenta</button>
+      </div>
+    </div>
+    <div class="card" style="box-shadow:none;margin-top:12px">
+      <table><tbody>
+        <tr><td>Total calculado</td><td class="num" id="admTotCalc">$0</td></tr>
+        <tr><td>Total real</td><td class="num" id="admTotReal">$0</td></tr>
+        <tr><td>Diferencia total</td><td class="num" id="admTotDiff">$0</td></tr>
+      </tbody></table>
+    </div>
+    <h3 style="font-size:.95rem;margin:16px 0 8px">Historial de conciliaciones</h3>
+    <div style="max-height:220px;overflow:auto" id="admHist"></div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="btn ghost" onclick="closeAdmin()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL NOTAS -->
 <div class="modal-back" id="notasModal">
   <div class="modal" style="max-width:520px">
@@ -601,6 +646,7 @@ let ajustes = { efectivo:1530000, cuenta:285000, umbralExtra:2000000 };  // ajus
 let charts = {};
 let extra={incomeCash:0,incomeCard:0,expenseCash:0,expenseCard:0};  // cobros adicionales / gastos ocasionales legacy (ya sin botón; datos preservados y leídos por el motor)
 let movimientos = [];   // ingresos/gastos manuales (Firebase col 'movimientos'): transacciones reales independientes de los cierres
+let conciliaciones = [];   // conciliaciones manuales de saldo (Firebase col 'conciliaciones'): ancla de saldo real; no toca históricos
 
 /* ---------- per-day math ---------- */
 const num   = v => Number((''+ (v==null?'':v)).replace(/[^0-9.-]/g,''))||0;  // cualquier valor (texto o número) -> número
@@ -721,6 +767,11 @@ onSnapshot(collection(db, "movimientos"),
     renderAll();
     if(document.getElementById('movsModal') && document.getElementById('movsModal').classList.contains('open')) renderMovsList();
   },
+  () => {}
+);
+/* conciliaciones manuales de saldos (efectivo/cuenta) — ancla de saldo real; no modifica históricos */
+onSnapshot(collection(db, "conciliaciones"),
+  snap => { conciliaciones = snap.docs.map(x => ({ id:x.id, ...x.data() })); renderAll(); },
   () => {}
 );
 /* registros de vales (adelantos a lavadores) */
@@ -1279,6 +1330,55 @@ function renderMovsList(){
 }
 window.openMovs=openMovs; window.closeMovs=closeMovs; window.editMov=editMov; window.deleteMov=deleteMov;
 
+/* ================= ADMINISTRACIÓN DE CUENTA — CONCILIACIÓN MANUAL (Firebase col 'conciliaciones') =================
+   La conciliación fija el saldo REAL como punto de partida. Se guarda como registro independiente:
+   NO modifica cierres, deudas, cobros, gastos ni movimientos (reglas #3/#30). No inventa ingresos ni
+   gastos y NO altera utilidad ni total generado (Secciones 11/12/23). El motor (calcFin) aplica solo la
+   ÚLTIMA conciliación de cada medio como ajuste (real − calculado) sobre el saldo calculado en vivo. */
+['admCashReal','admBankReal'].forEach(attachSep);
+function openAdmin(){ if(!requirePass()) return; const f=calcFin(); document.getElementById('admDate').valueAsDate=new Date(); document.getElementById('admObs').value=''; document.getElementById('admCashReal').value=sep(Math.round(f.efectivoReal)); document.getElementById('admBankReal').value=sep(Math.round(f.cuentaReal)); renderAdmin(); document.getElementById('adminModal').classList.add('open'); }
+function closeAdmin(){ document.getElementById('adminModal').classList.remove('open'); }
+document.getElementById('adminModal').addEventListener('click',e=>{ if(e.target.id==='adminModal') closeAdmin(); });
+['admCashReal','admBankReal'].forEach(id=>document.getElementById(id).addEventListener('input',renderAdmin));
+function renderAdmin(){
+  const box=document.getElementById('admHist'); if(!box) return;
+  const f=calcFin();
+  const cCalc=f.efectivo, bCalc=f.cuenta;
+  const cReal=numVal(document.getElementById('admCashReal')), bReal=numVal(document.getElementById('admBankReal'));
+  document.getElementById('admCashCalc').textContent=fmt(cCalc);
+  document.getElementById('admBankCalc').textContent=fmt(bCalc);
+  const dEl=(id,v)=>{const el=document.getElementById(id);el.textContent=fmt(v);el.className='num '+(v>0?'pos':(v<0?'neg':''));};
+  dEl('admCashDiff',cReal-cCalc); dEl('admBankDiff',bReal-bCalc);
+  document.getElementById('admTotCalc').textContent=fmt(cCalc+bCalc);
+  document.getElementById('admTotReal').textContent=fmt(cReal+bReal);
+  dEl('admTotDiff',(cReal+bReal)-(cCalc+bCalc));
+  const list=[...conciliaciones].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  box.innerHTML = list.length
+    ? '<table><thead><tr><th>Fecha</th><th>Medio</th><th class="num">Calculado</th><th class="num">Real</th><th class="num">Diferencia</th><th></th></tr></thead><tbody>'+
+      list.map(r=>{const d=num(r.difference);return '<tr><td>'+(r.fecha||'')+'</td><td>'+(r.account==='bank'?'Cuenta':'Efectivo')+'</td><td class="num">'+fmt(num(r.calculatedBalance))+'</td><td class="num">'+fmt(num(r.realBalance))+'</td><td class="num '+(d>0?'pos':(d<0?'neg':''))+'">'+fmt(d)+'</td><td><button type="button" class="mini-btn red" onclick="deleteRecon(\''+r.id+'\')">eliminar</button></td></tr>';}).join('')+'</tbody></table>'
+    : '<div class="empty">Aún no hay conciliaciones. Cuenta el dinero real y presiona “Conciliar”.</div>';
+}
+async function reconcile(account){
+  const f=calcFin();
+  const calc = account==='bank'? f.cuenta : f.efectivo;
+  const real = numVal(document.getElementById(account==='bank'?'admBankReal':'admCashReal'));
+  const fecha=document.getElementById('admDate').value||new Date().toISOString().slice(0,10);
+  const obs=document.getElementById('admObs').value.trim();
+  const diff=real-calc; const medio=account==='bank'?'cuenta':'efectivo';
+  if(!confirm('Conciliar '+medio+':\n\nCalculado: '+fmt(calc)+'\nReal: '+fmt(real)+'\nDiferencia: '+fmt(diff)+'\n\nSe guarda como registro independiente. NO modifica cierres ni deudas. ¿Continuar?')) return;
+  try{
+    await addDoc(collection(db,'conciliaciones'),{type:'reconciliation',account:account,calculatedBalance:calc,realBalance:real,difference:diff,fecha:fecha,concepto:'Conciliación manual de '+medio,obs:obs,createdAt:Date.now()});
+    alert('Conciliación registrada.\n\n'+(medio==='cuenta'?'Cuenta':'Efectivo')+' real: '+fmt(real)+' · diferencia: '+fmt(diff)+' · '+fecha);
+  }catch(err){ alert('No se pudo guardar la conciliación: '+err.message); }
+}
+async function deleteRecon(id){
+  const r=conciliaciones.find(x=>x.id===id); if(!r) return;
+  if(!confirm('¿Eliminar esta conciliación?\n\n'+(r.account==='bank'?'Cuenta':'Efectivo')+' · real '+fmt(num(r.realBalance))+' · '+(r.fecha||'')+'\n\nEl saldo real volverá a regirse por la conciliación anterior (o por el calculado si no hay otra). No afecta cierres, deudas ni movimientos.')) return;
+  try{ await deleteDoc(doc(db,'conciliaciones',id)); }
+  catch(err){ alert('No se pudo eliminar: '+err.message); }
+}
+window.openAdmin=openAdmin; window.closeAdmin=closeAdmin; window.reconcile=reconcile; window.deleteRecon=deleteRecon;
+
 /* ---------- render table ---------- */
 function debtCellHTML(d){
   const shO=sharedOut(d), ntO=netOut(d);
@@ -1387,6 +1487,17 @@ function calcFin(){
   const cuenta   = V + colCard + netRecvCard + parkCard + exIncCard + mIncCard
                    - expCard - valeCard - exExpCard - mExpCard + A_CU;
 
+  // ---- CONCILIACIÓN MANUAL (ancla de saldo real; NO afecta utilidad ni total generado — Secciones 11/12/23) ----
+  // Se aplica SOLO la última conciliación de cada medio como ajuste = (real − calculado en su momento).
+  // El saldo calculado sigue creciendo con las nuevas transacciones; efectivoReal = calculado + ajuste (Secciones 26/28).
+  const lastRecon = acc => { const l=conciliaciones.filter(r=>r.account===acc).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); return l.length?l[0]:null; };
+  const lastCashRecon=lastRecon('cash'), lastBankRecon=lastRecon('bank');
+  const cashAdj = lastCashRecon ? (num(lastCashRecon.realBalance)-num(lastCashRecon.calculatedBalance)) : 0;
+  const bankAdj = lastBankRecon ? (num(lastBankRecon.realBalance)-num(lastBankRecon.calculatedBalance)) : 0;
+  const efectivoReal = efectivo + cashAdj;   // EFECTIVO FÍSICO real conciliado (o calculado si no hay conciliación)
+  const cuentaReal   = cuenta   + bankAdj;   // CUENTA real conciliada
+  const totalRealDisp = efectivoReal + cuentaReal;
+
   // comisiones (solo lavados+parqueadero; deuda compartida ver conciliación)
   const comision = days.reduce((a,d)=>a+comm(d),0);                 // participación base (lavados+parqueadero)
   const partDebtTot = days.reduce((a,d)=>a+shTot(d)*((num(d.commPct)||commPct)/100),0);  // participación sobre deuda compartida GENERADA (Sección 17)
@@ -1404,23 +1515,23 @@ function calcFin(){
     mIncCash,mIncCard,mExpCash,mExpCard,mIncTot,mExpTot,
     colCash,colCard,netRecvCash,netRecvCard,parkCash,parkCard,expCash,expCard,
     gastosTot,gastosSinMetodo,valeCash,valeCard,exIncCash,exIncCard,exExpCash,exExpCard,
-    efectivo,cuenta,comision,partDebtTot,partLav,ingresoNegocio,utilidad,totalSinDeuda,totalConDeuda,marketing,ingresado};
+    efectivo,cuenta,cashAdj,bankAdj,efectivoReal,cuentaReal,totalRealDisp,lastCashRecon,lastBankRecon,comision,partDebtTot,partLav,ingresoNegocio,utilidad,totalSinDeuda,totalConDeuda,marketing,ingresado};
 }
 
 function renderKpis(){
   const f=calcFin();
   kTotal.textContent=fmt(f.generado);
-  kCash.textContent=fmt(f.efectivo);
-  kVirtual.textContent=fmt(f.cuenta);
+  kCash.textContent=fmt(f.efectivoReal);
+  kVirtual.textContent=fmt(f.cuentaReal);
   kPark.textContent=fmt(f.P);
   kComm.textContent=fmt(f.partLav);
   const kb=document.getElementById('kBiz'); if(kb) kb.textContent=fmt(f.ingresoNegocio);
   kExp.textContent=fmt(f.gastosTot);
   kNet.textContent=fmt(f.utilidad);
-  kNoDebt.textContent=fmt(f.totalSinDeuda);
-  kWithDebt.textContent=fmt(f.totalConDeuda);
+  kNoDebt.textContent=fmt(f.efectivoReal+f.cuentaReal);
+  kWithDebt.textContent=fmt(f.efectivoReal+f.cuentaReal+f.porCobrar);
   kDebt.textContent=fmt(f.porCobrar);
-  const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(f.efectivo);
+  const kcn=document.getElementById('kCashNow'); if(kcn) kcn.textContent=fmt(f.efectivoReal);
   const km=document.getElementById('kMkt'); if(km) km.textContent=fmt(f.marketing);
 }
 
@@ -1439,6 +1550,7 @@ function renderReconciliation(){
   if(f.partDebtTot>0) alerts.push('Participación de lavadores sobre deuda compartida reconocida en la utilidad: '+fmt(f.partDebtTot)+' (Sección 17: la deuda compartida reparte '+commPct+'% al lavador al generarse). Este monto todavía NO está asignado a un lavador específico en la pestaña Lavadores; esa asignación/pago se implementa en la 2ª entrega.');
   if(f.exIncCash||f.exIncCard||f.exExpCash||f.exExpCard) alerts.push('Ajustes extra legacy activos (config/ajustesExtra): +ef '+fmt(f.exIncCash)+' · +cta '+fmt(f.exIncCard)+' · −ef '+fmt(f.exExpCash)+' · −cta '+fmt(f.exExpCard)+'. Ya no hay botón que los genere; revísalos.');
   if(f.A_EF>0) alerts.push('Descuento fijo del EFECTIVO aplicado: '+fmt(f.A_EF)+' (cubre pagos a lavadores e insumos históricos pagados desde la caja).');
+  if(f.cashAdj!==0||f.bankAdj!==0) alerts.push('Conciliación manual activa (Administración de cuenta): ajuste efectivo '+fmt(f.cashAdj)+' · ajuste cuenta '+fmt(f.bankAdj)+'. Fija el saldo real como punto de partida; NO afecta utilidad ni total generado.');
   const rowT=(l,v,cls)=>'<tr><td>'+l+'</td><td class="num '+(cls||'')+'">'+fmt(v)+'</td></tr>';
   box.innerHTML=
     '<div class="grid-2" style="margin-bottom:4px">'+
@@ -1658,6 +1770,7 @@ function renderAll(){
   refreshPctLabels(); renderKpis(); renderReconciliation(); renderDays(); renderWashersDash();
   if(document.getElementById('resumen').classList.contains('active')) renderCharts();
   if(document.getElementById('lavadores').classList.contains('active')) renderWashChart();
+  const am=document.getElementById('adminModal'); if(am && am.classList.contains('open') && typeof renderAdmin==='function') renderAdmin();
 }
 
 /* ---------- Excel ---------- */
@@ -1691,6 +1804,8 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(nrows.length?nrows:[{Fecha:'',Autor:'',Nota:'',Estado:''}]),'Notas');
   const mrows=[...movimientos].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(m=>({Fecha:m.fecha||'',Tipo:(m.tipo==='gasto'?'Gasto':'Ingreso'),Concepto:m.concepto||'',Monto:num(m.monto),Medio:(m.medio==='virtual'?'tarjeta/cuenta':'efectivo'),Observación:m.obs||'',Fuente:'manual'}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mrows.length?mrows:[{Fecha:'',Tipo:'',Concepto:'',Monto:'',Medio:'','Observación':'',Fuente:''}]),'Movimientos');
+  const rrows=[...conciliaciones].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(r=>({Fecha:r.fecha||'',Medio:(r.account==='bank'?'Cuenta':'Efectivo'),Calculado:num(r.calculatedBalance),Real:num(r.realBalance),Diferencia:num(r.difference),['Observación']:r.obs||''}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rrows.length?rrows:[{Fecha:'',Medio:'',Calculado:'',Real:'',Diferencia:'',['Observación']:''}]),'Conciliaciones');
   XLSX.writeFile(wb,'lavado_vip_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 /* ---------- Reporte de VENTAS de los últimos 4 días ---------- */
